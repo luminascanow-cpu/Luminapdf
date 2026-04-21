@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "on-primary": "#f4f1ff",
+                "error": "#b41340",
+                "tertiary-container": "#ff9742",
+                "primary-dim": "#3939c7",
+                "outline": "#6f768e",
+                "secondary-container": "#ffc2c5",
+                "on-surface": "#272e42",
+                "surface-container-low": "#eef0ff",
+                "tertiary-fixed": "#ff9742",
+                "background": "#f6f6ff",
+                "tertiary-fixed-dim": "#f08934",
+                "on-error": "#ffefef",
+                "primary-container": "#9396ff",
+                "surface-container": "#e2e7ff",
+                "tertiary-dim": "#7e3e00",
+                "on-tertiary-container": "#4f2500",
+                "inverse-primary": "#8083ff",
+                "surface-bright": "#f6f6ff",
+                "on-primary-fixed-variant": "#0e009d",
+                "secondary": "#b80438",
+                "secondary-fixed": "#ffc2c5",
+                "on-secondary-container": "#93002a",
+                "outline-variant": "#a5adc6",
+                "surface-tint": "#4647d3",
+                "surface": "#f6f6ff",
+                "on-tertiary": "#fff0e8",
+                "inverse-on-surface": "#959cb5",
+                "error-container": "#f74b6d",
+                "inverse-surface": "#060e20",
+                "on-secondary-fixed": "#6f001e",
+                "on-surface-variant": "#535b71",
+                "surface-container-high": "#d9e2ff",
+                "on-error-container": "#510017",
+                "secondary-fixed-dim": "#ffaeb3",
+                "surface-variant": "#d1dcff",
+                "on-primary-fixed": "#000000",
+                "tertiary": "#904800",
+                "on-tertiary-fixed": "#2b1100",
+                "surface-dim": "#c7d4fa",
+                "on-secondary-fixed-variant": "#a40030",
+                "primary-fixed-dim": "#8387ff",
+                "on-primary-container": "#0a0081",
+                "on-secondary": "#ffefef",
+                "on-background": "#272e42",
+                "primary-fixed": "#9396ff",
+                "primary": "#4647d3",
+                "on-tertiary-fixed-variant": "#5d2c00",
+                "secondary-dim": "#a20030",
+                "surface-container-highest": "#d1dcff",
+                "error-dim": "#a70138",
+                "surface-container-lowest": "#ffffff"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "2xl": "1rem",
+                "3xl": "1.5rem",
+                "full": "9999px"
+            },
+            "fontFamily": {
+                "headline": ["Plus Jakarta Sans"],
+                "body": ["Manrope"],
+                "label": ["Manrope"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Manrope', sans-serif; background-color: #f6f6ff; }
+        .font-headline { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface min-h-screen pb-32">
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 w-full z-40 px-6 bg-gradient-to-br from-[#4647d3] to-[#9396ff] rounded-b-[2rem] h-48 flex items-end pb-8">
+<div class="w-full flex justify-between items-center mb-12">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full border-2 border-white/20 overflow-hidden">
+<img alt="User" class="w-full h-full object-cover" data-alt="close up professional portrait of a woman in creative studio with soft blue ambient lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfBc0Vi_rdQCuKwoKNyqyCimH3omQh4Ud8fn-7ave5ZbU-yzObqimAlPStmx-APqrt0CTjzv6Id-YDYJKU1vkO5P7LnkKBryvo0T3jreXyEN2BHSbIdajQCj9olPkFSDr1d_yJHiPJfYbH3yOZbH_M2UWsbwu9rpx5QygGRxl3H_YID3bJWtNJMpEC5GZtn9k5DdCPoF7wtcpl5W0KmmHKKlRIbF9QBQOcD-kMJKEDXfJi7k2IdI0Sycqpvin75Pwaw0joQPC0bg"/>
+</div>
+<h1 class="text-white font-headline font-bold tracking-tight text-2xl">The Archivist</h1>
+</div>
+<button class="text-white opacity-70 hover:opacity-100 transition-opacity active:scale-95">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+</header>
+<main class="relative z-10 px-6 pt-36">
+<!-- Dashboard Statistics -->
+<div class="grid grid-cols-2 gap-4 -mt-16">
+<div class="bg-surface-container-lowest p-6 rounded-3xl shadow-[0_8px_24px_rgba(39,46,66,0.04)] border border-outline-variant/10">
+<p class="text-on-surface-variant font-label text-[10px] uppercase tracking-wider mb-1">Weekly Scans</p>
+<div class="flex items-end gap-2">
+<span class="text-3xl font-headline font-extrabold text-primary">24</span>
+<span class="text-secondary font-bold text-sm pb-1">+12%</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-3xl shadow-[0_8px_24px_rgba(39,46,66,0.04)] border border-outline-variant/10">
+<p class="text-on-surface-variant font-label text-[10px] uppercase tracking-wider mb-1">Total Docs</p>
+<div class="flex items-end gap-2">
+<span class="text-3xl font-headline font-extrabold text-on-surface">1,284</span>
+</div>
+</div>
+</div>
+<!-- Section Header -->
+<div class="mt-10 mb-6 flex justify-between items-center">
+<h2 class="font-headline font-bold text-xl tracking-tight text-on-surface">Recent Library</h2>
+<div class="flex gap-2">
+<button class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]" data-icon="grid_view">grid_view</span>
+</button>
+<button class="w-10 h-10 rounded-xl bg-surface-container-highest flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]" data-icon="filter_list">filter_list</span>
+</button>
+</div>
+</div>
+<!-- Bento Grid Layout for Documents -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Document Card 1: PDF -->
+<div class="bg-surface-container-lowest rounded-3xl p-4 shadow-[0_8px_24px_rgba(39,46,66,0.06)] border border-outline-variant/5 group transition-all duration-300 active:scale-98">
+<div class="relative h-48 rounded-2xl overflow-hidden bg-surface-container-low mb-4">
+<img class="w-full h-full object-cover opacity-90" data-alt="clean overhead shot of a business contract document with professional typography and minimalist layout" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGaptR717Uc0XLBJlnOeMxXeFfQHy-zybyv78AeydptHqX90d4a04XqD3ulwQBNNeaN4G0Q_LOt6tYmnX6RBKxGZRTyyPjbAQEVw7jbVvzSEnysawQjhvwGkMUr6e5UlOC9B40RhIzCmRNcahrAK7yrL42Z2N1bdqsOiLlm7sZL5mlSRfyu-JiU72W6S6BCCJR4V2RwStg0-5nVC11WBv8qcLiv1vwlALzBQqGuSx5Lx653g7r2XqU0XyhDXk3ivrAZOdi1OyA7A"/>
+<div class="absolute top-3 left-3 px-3 py-1 bg-secondary text-white font-label text-[10px] font-bold uppercase rounded-full tracking-widest">PDF</div>
+<div class="absolute bottom-3 right-3 px-2 py-1 bg-white/80 backdrop-blur-md rounded-lg text-on-surface font-bold text-[10px]">12 PGS</div>
+</div>
+<div class="px-2">
+<h3 class="font-headline font-bold text-on-surface text-lg leading-tight truncate">Quarterly_Report_Q3.pdf</h3>
+<div class="flex justify-between items-center mt-3">
+<span class="text-on-surface-variant font-medium text-xs">Oct 24, 2023 • 4.2 MB</span>
+<button class="text-outline-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Document Card 2: DOCX -->
+<div class="bg-surface-container-lowest rounded-3xl p-4 shadow-[0_8px_24px_rgba(39,46,66,0.06)] border border-outline-variant/5 transition-all duration-300 active:scale-98">
+<div class="relative h-48 rounded-2xl overflow-hidden bg-surface-container-low mb-4">
+<img class="w-full h-full object-cover opacity-90" data-alt="macro photo of a hand-written project proposal with neat handwriting on ivory textured paper" src="https://lh3.googleusercontent.com/aida-public/AB6AXuArx-7QrfDAefYvfV1PyvhDKQVJKwTo_reG0u9p1fb0Uh1JGAmX20jlNCI9L2rTIz8bqvhwCEociBD4w3H_OoOBrB-_6z4dd_wRb4hH7RGTj0W9wi-l7UJJo5IlBsX1ME68P-DP3A-H9Nm7IupAHYLIos0qUqPsU40mX7EqYCHWUWdES59d_Afau62esWfQaVMCYAbUi-kacMrcPawK26TXPOnXNevCm4qHrgMwAQdUQ0W4rI-M-cXpJjeWJbYYS5yRqmh0pGOrcQ"/>
+<div class="absolute top-3 left-3 px-3 py-1 bg-primary text-white font-label text-[10px] font-bold uppercase rounded-full tracking-widest">DOCX</div>
+<div class="absolute bottom-3 right-3 px-2 py-1 bg-white/80 backdrop-blur-md rounded-lg text-on-surface font-bold text-[10px]">4 PGS</div>
+</div>
+<div class="px-2">
+<h3 class="font-headline font-bold text-on-surface text-lg leading-tight truncate">Project_Alpha_Brief.docx</h3>
+<div class="flex justify-between items-center mt-3">
+<span class="text-on-surface-variant font-medium text-xs">Oct 22, 2023 • 1.8 MB</span>
+<button class="text-outline-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Document Card 3: JPG -->
+<div class="bg-surface-container-lowest rounded-3xl p-4 shadow-[0_8px_24px_rgba(39,46,66,0.06)] border border-outline-variant/5 transition-all duration-300 active:scale-98">
+<div class="relative h-48 rounded-2xl overflow-hidden bg-surface-container-low mb-4">
+<img class="w-full h-full object-cover opacity-90" data-alt="neatly organized stack of colorful business receipts on a wooden surface with warm soft focus lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCRzx_l8P_Nx_W-kaKR2hLtRUzuLeDYT2hRTVdu6vjxgYcZJILdQyrGzmHo5aUGrDHFk-A_FVTPg_292ekgODlcLQRSOYQmw9cE78VDv_SVcXYcV5HOrSqFxk1WyBWtDKZPrHeJjiN3d1sbmW0bB2k7JvrmWoBnOf_7HZcnfoSg1lFUROvciDQdIiX8nqeP7V4do9NvFvF-ZYX70UDqELN10hJPyoucS1FMv8Ilovds7Ec9FQw2p1tt5bSSf3KMYi3c4GCyLwurw"/>
+<div class="absolute top-3 left-3 px-3 py-1 bg-tertiary text-white font-label text-[10px] font-bold uppercase rounded-full tracking-widest">JPG</div>
+<div class="absolute bottom-3 right-3 px-2 py-1 bg-white/80 backdrop-blur-md rounded-lg text-on-surface font-bold text-[10px]">1 PG</div>
+</div>
+<div class="px-2">
+<h3 class="font-headline font-bold text-on-surface text-lg leading-tight truncate">Receipt_Travel_Expense.jpg</h3>
+<div class="flex justify-between items-center mt-3">
+<span class="text-on-surface-variant font-medium text-xs">Oct 21, 2023 • 850 KB</span>
+<button class="text-outline-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Document Card 4: TXT -->
+<div class="bg-surface-container-lowest rounded-3xl p-4 shadow-[0_8px_24px_rgba(39,46,66,0.06)] border border-outline-variant/5 transition-all duration-300 active:scale-98">
+<div class="relative h-48 rounded-2xl overflow-hidden bg-surface-container-low mb-4">
+<img class="w-full h-full object-cover opacity-90" data-alt="close up of fountain pen writing on a blank notebook with shallow depth of field and atmospheric lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcSNsnD54OLOJqi5jdI0W9E-YeFMgFPMW23SWHie_hsM2ZfJsIEcXyXLxkY1A8ZafuAwZgnIP7E0OECTTR7YvF75L600CPW1MjzX1j6f4rUKXJMYmuDJhVjeClFKZKFuwC4QDOE2BJq5iQP9WKL49Dk-wjxO_JJfFjkuA8lYoXM15_T4yPVMG9NIKfT-HtvGsKbq8jmnEDaR5ss5qjUbOhVH1lj2nnuXD6KGC6RqMimIXvmfuiCve3aIiHoG2-LqZwhlryxjQisw"/>
+<div class="absolute top-3 left-3 px-3 py-1 bg-tertiary text-white font-label text-[10px] font-bold uppercase rounded-full tracking-widest">TXT</div>
+<div class="absolute bottom-3 right-3 px-2 py-1 bg-white/80 backdrop-blur-md rounded-lg text-on-surface font-bold text-[10px]">1 PG</div>
+</div>
+<div class="px-2">
+<h3 class="font-headline font-bold text-on-surface text-lg leading-tight truncate">Meeting_Notes_Unarchived.txt</h3>
+<div class="flex justify-between items-center mt-3">
+<span class="text-on-surface-variant font-medium text-xs">Oct 19, 2023 • 12 KB</span>
+<button class="text-outline-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Scanner FAB -->
+<button class="fixed bottom-24 right-6 w-16 h-16 rounded-full bg-gradient-to-br from-secondary to-tertiary-fixed shadow-[0_8px_24px_rgba(184,4,56,0.3)] flex items-center justify-center text-white z-50 hover:scale-105 active:scale-95 transition-transform duration-300 border-t border-white/20">
+<span class="material-symbols-outlined text-3xl font-bold" data-icon="document_scanner">document_scanner</span>
+</button>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center h-20 px-4 pb-safe bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-t-[2rem] border-t border-slate-200/15 shadow-[0_-8px_24px_rgba(39,46,66,0.06)]">
+<!-- Library Active -->
+<a class="flex flex-col items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold hover:text-indigo-500 transition-colors scale-95 active:duration-300" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="folder_open" style="font-variation-settings: 'FILL' 1;">folder_open</span>
+<span class="font-['Manrope'] font-medium text-[10px] uppercase tracking-wider">Library</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 hover:text-indigo-500 transition-colors scale-95 active:duration-300" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="search">search</span>
+<span class="font-['Manrope'] font-medium text-[10px] uppercase tracking-wider">Search</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 hover:text-indigo-500 transition-colors scale-95 active:duration-300" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="inventory_2">inventory_2</span>
+<span class="font-['Manrope'] font-medium text-[10px] uppercase tracking-wider">Archive</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 hover:text-indigo-500 transition-colors scale-95 active:duration-300" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="person">person</span>
+<span class="font-['Manrope'] font-medium text-[10px] uppercase tracking-wider">Profile</span>
+</a>
+</nav>
+</body></html>

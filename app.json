@@ -2,28 +2,53 @@
   "expo": {
     "name": "LuminaScanApp",
     "slug": "LuminaScanApp",
-    "version": "1.0.0",
+    "scheme": "lumina-scan",
+    "owner": "jay271987",
+    "version": "1.0.6",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#f6f6ff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "LuminaScan needs access to your camera to scan documents."
+      }
     },
     "android": {
+      "package": "com.lumina.scanapp",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "versionCode": 3,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO"
+      ],
       "edgeToEdgeEnabled": true
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
+    "plugins": [
+      "react-native-document-scanner-plugin",
+      "expo-camera",
+      "expo-sqlite",
+      "expo-router",
+      "expo-font",
+      "expo-media-library"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d952dd6b-a830-43de-94f8-81d5650ae416"
+      }
     }
   }
 }
