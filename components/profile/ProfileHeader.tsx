@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Edit3, CheckCircle, FileText, Award } from 'lucide-react-native';
@@ -27,13 +27,19 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   scannedCount,
   onEditPress,
 }) => {
+  const [showAvatarImage, setShowAvatarImage] = useState(Boolean(avatarUrl));
+
   return (
     <SafeAreaView edges={['top']} style={styles.header}>
       <View style={styles.profileHeader}>
         {/* Avatar — real image if available, else initials */}
         <View style={styles.avatarWrapper}>
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+          {avatarUrl && showAvatarImage ? (
+            <Image
+              source={{ uri: avatarUrl }}
+              style={styles.avatarImg}
+              onError={() => setShowAvatarImage(false)}
+            />
           ) : (
             <View style={[styles.avatarFallback, { backgroundColor: avatarColor }]}>
               <Text style={styles.avatarInitials}>{initials}</Text>

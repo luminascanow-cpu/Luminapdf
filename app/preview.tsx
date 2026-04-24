@@ -7,28 +7,30 @@ import { ArrowLeft, Check, ImageIcon, Share2, FileDigit, Crop, Trash2, Sliders, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TextInput } from 'react-native';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { saveDocument, updateDocument } from '../lib/storage';
-import { generateDocx } from '../lib/docxGenerator';
 import { usePermissions } from '../hooks/usePermissions';
 import * as MediaLibrary from 'expo-media-library';
+import { extractTextFromImages } from '../lib/textExtractor';
+import { FREE_PAGE_LIMIT, getUsageGateState } from '../lib/paymentGate';
+import { UpgradeRequiredModal } from '../components/UpgradeRequiredModal';
 
-type ExportFormat = 'PDF' | 'JPG' | 'PNG' | 'DOCX';
+type ExportFormat = 'PDF' | 'JPG' | 'PNG' | 'TXT';
 
 const mimeMap: Record<ExportFormat, string> = {
   PDF: 'application/pdf',
   JPG: 'image/jpeg',
   PNG: 'image/png',
-  DOCX: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  TXT: 'text/plain',
 };
 
 const utiMap: Record<ExportFormat, string> = {
   PDF: 'com.adobe.pdf',
   JPG: 'public.jpeg',
   PNG: 'public.png',
-  DOCX: 'org.openxmlformats.wordprocessingml.document',
+  TXT: 'public.plain-text',
 };
 
 export default function PreviewScreen() {
@@ -72,6 +74,9 @@ export default function PreviewScreen() {
    const [showSuccessModal, setShowSuccessModal] = useState(false);
    const [exportedUri, setExportedUri] = useState<string | null>(null);
    const [draftId, setDraftId] = useState<number | null>(parsedRouteDraftId);
+   const isTxtExtractionAvailable = Platform.OS === 'android';
+   const [upgradeMessage, setUpgradeMessage] = useState('');
+   const [isUpgradeModalVisible, setIsUpgradeModalVisible] = useState(false);
 
    useEffect(() => {
      const nextName = initialName || fallbackDocumentName;
@@ -114,36 +119,19 @@ export default function PreviewScreen() {
        }
    }, [fallbackDocumentName, initialName, parsedRouteDraftId]);
 
-   // Sync search params to state — also normalise EXIF rotation on every incoming image
+   // Sync search params to state without re-encoding the full document on every reopen.
+   // Scanner/import paths already provide prepared image URIs, and reprocessing here
+   // both slows down resumed sessions and compounds JPEG quality loss.
    useEffect(() => {
        if (initialParsedUris.length === 0) return;
-
-       const normaliseUris = async () => {
-           try {
-               const fixed = await Promise.all(
-                   initialParsedUris.map(async (uri: string) => {
-                       // Passing [] with a compress+format call forces ImageManipulator to
-                       // re-encode the file and apply the embedded EXIF rotation, so the
-                       // image always appears upright in the <Image> component.
-                       const r = await ImageManipulator.manipulateAsync(
-                           uri,
-                           [],
-                           { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }
-                       );
-                       return r.uri;
-                   })
-               );
-               setLocalUris(fixed);
-               void persistDraftState(fixed);
-           } catch {
-               // Fallback: use raw URIs if normalisation fails
-               setLocalUris(initialParsedUris);
-               void persistDraftState(initialParsedUris);
-           }
-       };
-
-       void normaliseUris();
+       setLocalUris(initialParsedUris);
+       void persistDraftState(initialParsedUris);
    }, [initialParsedUris, persistDraftState]);
+
+   useEffect(() => {
+     if (activeIndex < localUris.length) return;
+     setActiveIndex(Math.max(0, localUris.length - 1));
+   }, [activeIndex, localUris.length]);
 
   const triggerShare = async (format: ExportFormat) => {
     if (!exportedUri) return;
@@ -234,17 +222,13 @@ export default function PreviewScreen() {
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
             .page {
               width: 100%;
-              min-height: 100vh;
-              display: flex;
-              align-items: center;
-              justify-content: center;
+              page-break-inside: avoid;
               background: white;
             }
             img {
               width: 100%;
               height: auto;
               display: block;
-              object-fit: contain;
             }
             @page { margin: 0; size: auto; }
           </style>
@@ -257,6 +241,7 @@ export default function PreviewScreen() {
   };
 
   const { ensureStoragePermission } = usePermissions();
+  const exportLabel = format === 'TXT' ? 'Extracted Text' : format;
 
   const handleExport = async () => {
     // Safety checks
@@ -269,6 +254,11 @@ export default function PreviewScreen() {
 
     if (format === 'JPG' && localUris.length > 1) {
       Alert.alert('Format Conflict', 'JPG export only supports 1 page. Please select PDF to export all pages.');
+      return;
+    }
+
+    if (format === 'TXT' && !isTxtExtractionAvailable) {
+      Alert.alert('Unavailable', 'Text extraction is currently available on Android only.');
       return;
     }
 
@@ -302,12 +292,26 @@ export default function PreviewScreen() {
         } catch (pdfErr: any) {
           throw new Error(`PDF generation failed: ${pdfErr.message}`);
         }
-      } else if (format === 'DOCX') {
+      } else if (format === 'TXT') {
         try {
-          tempExportUri = await generateDocx(localUris, cleanBaseName);
+          const extraction = await extractTextFromImages(localUris);
+          const extractedText = extraction.text.trim();
+
+          if (!extractedText) {
+            throw new Error('No readable text was found in this scan.');
+          }
+
+          if ((await FileSystem.getInfoAsync(finalFileUri)).exists) {
+            await FileSystem.deleteAsync(finalFileUri);
+          }
+
+          await FileSystem.writeAsStringAsync(finalFileUri, extractedText, {
+            encoding: FileSystem.EncodingType.UTF8,
+          });
+          tempExportUri = finalFileUri;
           alreadyNamedAtFinalPath = true;
-        } catch (docxErr: any) {
-          throw new Error(`DOCX generation failed: ${docxErr.message}`);
+        } catch (textErr: any) {
+          throw new Error(`Text extraction failed: ${textErr.message}`);
         }
       } else {
         // Image formats (JPG/PNG)
@@ -376,7 +380,7 @@ export default function PreviewScreen() {
         try {
           await Sharing.shareAsync(encodedShareUri, {
             mimeType: mimeMap[format],
-            dialogTitle: `Export ${format}`,
+            dialogTitle: `Export ${exportLabel}`,
             UTI: utiMap[format]
           });
         } catch (shareErr: any) {
@@ -428,7 +432,14 @@ export default function PreviewScreen() {
     );
   };
 
-  const handleAddPage = () => {
+  const handleAddPage = async () => {
+    const usage = await getUsageGateState();
+    if (!usage.isUnlocked && localUris.length >= FREE_PAGE_LIMIT) {
+      setUpgradeMessage(`Free access allows up to ${FREE_PAGE_LIMIT} pages in one scan session.`);
+      setIsUpgradeModalVisible(true);
+      return;
+    }
+
     router.push({
       pathname: '/scanner',
       params: {
@@ -565,16 +576,16 @@ export default function PreviewScreen() {
             showsHorizontalScrollIndicator={false}
             onScroll={(e) => {
               const x = e.nativeEvent.contentOffset.x;
-              setActiveIndex(Math.round(x / Math.max(width - 48, 1)));
+              setActiveIndex(Math.round(x / Math.max(width - 24, 1)));
             }}
             scrollEventThrottle={16}
             contentContainerStyle={styles.carouselInner}
           >
             {localUris.map((uri, index) => (
-              <View key={index} style={[styles.previewCard, { width: width - 48 }]}>
+              <View key={index} style={[styles.previewCard, { width: width - 24 }]}>
                 <View style={styles.previewImageFrame}>
                   {isProcessing && activeIndex === index ? (
-                    <View style={[styles.previewImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.05)' }]}>
+                    <View style={[styles.previewImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }]}>
                       <ActivityIndicator color={Palette.primary} />
                     </View>
                   ) : (
@@ -600,7 +611,7 @@ export default function PreviewScreen() {
       {/* Floating Toolbar */}
       <View style={styles.toolbarContainer}>
           <View style={styles.toolbar}>
-            <Pressable onPress={handleAddPage} style={styles.toolItem}>
+            <Pressable onPress={() => void handleAddPage()} style={styles.toolItem}>
                 <View style={styles.toolIcon}>
                     <Plus size={20} color="#FFF" />
                 </View>
@@ -670,15 +681,23 @@ export default function PreviewScreen() {
               </Pressable>
 
               <Pressable 
-                onPress={() => setFormat('DOCX')}
-                style={[styles.formatBtn, format === 'DOCX' && styles.formatActive]}
+                onPress={() => {
+                  if (!isTxtExtractionAvailable) {
+                    Alert.alert('Unavailable', 'Text extraction is currently available on Android only.');
+                    return;
+                  }
+                  setFormat('TXT');
+                }}
+                style={[styles.formatBtn, format === 'TXT' && styles.formatActive, !isTxtExtractionAvailable && { opacity: 0.45 }]}
               >
-                  <FileText size={24} color={format === 'DOCX' ? Palette.primary : Palette.outlineVariant} />
+                  <FileText size={24} color={format === 'TXT' ? Palette.primary : Palette.outlineVariant} />
                   <View style={{ flex: 1 }}>
-                      <Text style={[styles.formatBtnLabel, format === 'DOCX' && styles.textActive]}>Word Document</Text>
-                      <Text style={styles.formatBtnSub}>Editable file</Text>
+                      <Text style={[styles.formatBtnLabel, format === 'TXT' && styles.textActive]}>Extract content from PDF</Text>
+                      <Text style={styles.formatBtnSub}>
+                        {isTxtExtractionAvailable ? 'Save OCR text as .txt' : 'Android only'}
+                      </Text>
                   </View>
-                  {format === 'DOCX' && <Check size={16} color={Palette.primary} strokeWidth={3} />}
+                  {format === 'TXT' && <Check size={16} color={Palette.primary} strokeWidth={3} />}
               </Pressable>
           </View>
       </View>
@@ -690,7 +709,7 @@ export default function PreviewScreen() {
           <View style={[styles.modalOverlay, { backgroundColor: 'rgba(255,255,255,0.85)' }]}>
               <View style={styles.loadingCard}>
                   <ActivityIndicator size="large" color={Palette.primary} />
-                  <Text style={styles.loadingText}>Generating {format}...</Text>
+                  <Text style={styles.loadingText}>{format === 'TXT' ? 'Extracting text...' : `Generating ${format}...`}</Text>
                   <Text style={styles.loadingSub}>This might take a moment depending on the number of pages.</Text>
               </View>
           </View>
@@ -702,7 +721,7 @@ export default function PreviewScreen() {
           <View style={styles.shareSheet}>
             <View style={styles.shareSheetHeader}>
               <Text style={styles.shareSheetTitle}>Saved Successfully!</Text>
-              <Pressable onPress={() => { setShowSuccessModal(false); router.replace('/(tabs)/home'); }}>
+              <Pressable onPress={() => { setShowSuccessModal(false); router.replace('/(tabs)/history'); }}>
                 <X size={24} color={Palette.onSurfaceVariant} />
               </Pressable>
             </View>
@@ -733,13 +752,23 @@ export default function PreviewScreen() {
 
             <Pressable 
               style={styles.doneBtn} 
-              onPress={() => { setShowSuccessModal(false); router.replace('/(tabs)/home'); }}
+              onPress={() => { setShowSuccessModal(false); router.replace('/(tabs)/history'); }}
             >
               <Text style={styles.doneBtnText}>Back to Home</Text>
             </Pressable>
           </View>
         </View>
       </Modal>
+
+      <UpgradeRequiredModal
+        visible={isUpgradeModalVisible}
+        message={upgradeMessage}
+        onClose={() => setIsUpgradeModalVisible(false)}
+        onOpenPayment={() => {
+          setIsUpgradeModalVisible(false);
+          router.push('/payment');
+        }}
+      />
 
       {/* Rename Modal — KeyboardAvoidingView ensures "Save Name" is always visible */}
       <Modal visible={isRenameModalVisible} transparent animationType="fade">
@@ -869,19 +898,16 @@ const styles = StyleSheet.create({
       alignItems: 'center',
   },
   previewCard: {
-      backgroundColor: Palette.surfaceContainerLowest,
-      borderRadius: Radius.xxxl,
-      padding: 12,
-      ...Shadows.ambient,
-      marginHorizontal: 4,
-      borderWidth: 1,
-      borderColor: Palette.outlineVariant + '0D',
+      backgroundColor: '#FFFFFF',
+      borderRadius: Radius.xxl,
+      padding: 0,
+      marginHorizontal: 12,
   },
   previewImageFrame: {
       aspectRatio: 3/4,
       borderRadius: Radius.xxl,
       overflow: 'hidden',
-      backgroundColor: Palette.surfaceContainerLow,
+      backgroundColor: '#FFFFFF',
   },
   previewImage: {
       width: '100%',

@@ -4,13 +4,71 @@ import { useEffect } from 'react';
 import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans';
 import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold } from '@expo-google-fonts/manrope';
 import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
+import { Image, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { initDatabase } from '../lib/storage';
 import { useAuth } from '../hooks/useAuth';
 import { useHeartbeat } from '../hooks/useHeartbeat';
+import { Gradients } from '../constants/Theme';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
+
+function BootSplash() {
+  return (
+    <LinearGradient
+      colors={Gradients.primary}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+    >
+      <View
+        style={{
+          width: 128,
+          height: 128,
+          borderRadius: 36,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(255,255,255,0.14)',
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.18)',
+          shadowColor: '#120f3d',
+          shadowOffset: { width: 0, height: 16 },
+          shadowOpacity: 0.22,
+          shadowRadius: 32,
+          elevation: 10,
+        }}
+      >
+        <Image
+          source={require('../assets/app-logo.png')}
+          style={{ width: 84, height: 84 }}
+          resizeMode="contain"
+        />
+      </View>
+      <Text
+        style={{
+          marginTop: 24,
+          fontFamily: 'PlusJakartaSans-ExtraBold',
+          fontSize: 28,
+          color: '#FFF',
+          letterSpacing: 0.3,
+        }}
+      >
+        LuminaScan
+      </Text>
+      <Text
+        style={{
+          marginTop: 8,
+          fontFamily: 'Manrope-Medium',
+          fontSize: 14,
+          color: 'rgba(255,255,255,0.82)',
+        }}
+      >
+        Preparing your scanner
+      </Text>
+    </LinearGradient>
+  );
+}
 
 export default function RootLayout() {
   const { initialized, session } = useAuth();
@@ -45,13 +103,14 @@ export default function RootLayout() {
   }, [loaded, error]);
 
   if (!loaded && !error) {
-    return null;
+    return <BootSplash />;
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f6f6ff' }}>
       <StatusBar style="dark" />
       <Stack
+        initialRouteName="login"
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: '#f6f6ff' },
@@ -59,8 +118,11 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="login" options={{ animation: 'fade' }} />
+        <Stack.Screen name="auth/callback" options={{ animation: 'fade' }} />
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="payment" />
+        <Stack.Screen name="reset-password" options={{ animation: 'fade' }} />
         <Stack.Screen name="scanner" options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="preview" />
       </Stack>

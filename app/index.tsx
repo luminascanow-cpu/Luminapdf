@@ -1,28 +1,33 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, Modal, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions, Modal, ActivityIndicator, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Palette, Gradients, Shadows, Radius } from '../constants/Theme';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Camera, Settings, X, Image as ImageIcon, ChevronRight, FileDigit, FileImage } from 'lucide-react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Camera, X, Image as ImageIcon, ChevronRight, FileDigit, FileImage } from 'lucide-react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import { Document, getDocuments } from '../lib/storage';
 import { optimizeImages } from '../lib/imageOptimizer';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import { FREE_PAGE_LIMIT, getUsageGateState } from '../lib/paymentGate';
+import { UpgradeRequiredModal } from '../components/UpgradeRequiredModal';
 
 const { width } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { initialized, user } = useAuth();
   const [docCount, setDocCount] = useState(0);
   const [exportedDocs, setExportedDocs] = useState<Document[]>([]);
   const [showScanOptions, setShowScanOptions] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [profileName, setProfileName] = useState<string | null>(null);
+  const [upgradeMessage, setUpgradeMessage] = useState('');
+  const [isUpgradeModalVisible, setIsUpgradeModalVisible] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -60,9 +65,20 @@ export default function WelcomeScreen() {
     'LuminaScan User';
   const syncLabel = user ? 'Account Active' : 'Loading Account';
 
+  const openPaymentGate = (message: string) => {
+    setUpgradeMessage(message);
+    setIsUpgradeModalVisible(true);
+  };
+
   const handlePickFromLibrary = async () => {
     setShowScanOptions(false);
     try {
+      const usage = await getUsageGateState();
+      if (!usage.isUnlocked && usage.usedFreeScans >= usage.freeScanLimit) {
+        openPaymentGate('Your 5 free scans are finished. Make the one-time payment to continue scanning.');
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
@@ -70,6 +86,11 @@ export default function WelcomeScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
+        if (!usage.isUnlocked && result.assets.length > FREE_PAGE_LIMIT) {
+          openPaymentGate(`Free access allows up to ${FREE_PAGE_LIMIT} pages in one scan session. Unlock full access to import more pages.`);
+          return;
+        }
+
         setIsProcessing(true);
         const uris = result.assets.map(a => a.uri);
         const optimized = await optimizeImages(uris);
@@ -93,7 +114,7 @@ export default function WelcomeScreen() {
         return '#4FC3F7';
       case 'PNG':
         return '#81C784';
-      case 'DOCX':
+      case 'TXT':
         return '#7986CB';
       default:
         return Palette.primary;
@@ -112,6 +133,10 @@ export default function WelcomeScreen() {
     }, [])
   );
 
+  if (!initialized || !user) {
+    return null;
+  }
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -122,30 +147,35 @@ export default function WelcomeScreen() {
       >
         <SafeAreaView edges={['top']} style={styles.headerContent}>
           <View style={styles.headerTop}>
-            <View style={styles.userInfo}>
-              <Pressable style={styles.settingsBtn} onPress={() => router.push('/profile')}>
-                <Settings size={20} color={Palette.onPrimary} />
-              </Pressable>
-              <View style={styles.avatarContainer}>
-                <Image
-                  source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAfBc0Vi_rdQCuKwoKNyqyCimH3omQh4Ud8fn-7ave5ZbU-yzObqimAlPStmx-APqrt0CTjzv6Id-YDYJKU1vkO5P7LnkKBryvo0T3jreXyEN2BHSbIdajQCj9olPkFSDr1d_yJHiPJfYbH3yOZbH_M2UWsbwu9rpx5QygGRxl3H_YID3bJWtNJMpEC5GZtn9k5DdCPoF7wtcpl5W0KmmHKKlRIbF9QBQOcD-kMJKEDXfJi7k2IdI0Sycqpvin75Pwaw0joQPC0bg' }}
-                  style={styles.avatar}
-                />
-              </View>
-              <View>
-                <Text style={styles.title}>{displayName}</Text>
-                <View style={styles.syncStatus}>
-                  <View style={styles.syncDot} />
-                  <Text style={styles.syncText}>{syncLabel}</Text>
+            <Pressable
+              onPress={() => router.push('/profile')}
+              style={({ pressed }) => [styles.userInfoPressable, pressed && { opacity: 0.82 }]}
+            >
+              <View style={styles.userInfo}>
+                <View style={styles.avatarContainer}>
+                  <Image
+                    source={require('../assets/app-logo.png')}
+                    style={styles.avatar}
+                  />
+                </View>
+                <View>
+                  <Text style={styles.title}>{displayName}</Text>
+                  <View style={styles.syncStatus}>
+                    <View style={styles.syncDot} />
+                    <Text style={styles.syncText}>{syncLabel}</Text>
+                  </View>
                 </View>
               </View>
-            </View>
+            </Pressable>
           </View>
         </SafeAreaView>
       </LinearGradient>
 
       <ScrollView 
-        contentContainerStyle={styles.scrollContent} 
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: 176 + insets.bottom },
+        ]}
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
@@ -224,6 +254,7 @@ export default function WelcomeScreen() {
                 onPress={() => setShowScanOptions(true)}
                 style={({ pressed }) => [
                 styles.scanBtn,
+                { marginBottom: 64 + insets.bottom },
                 pressed && { transform: [{ scale: 0.95 }] }
                 ]}
             >
@@ -254,7 +285,18 @@ export default function WelcomeScreen() {
                     </Pressable>
                 </View>
                 
-                <Pressable style={styles.optionBtn} onPress={() => { setShowScanOptions(false); router.push('/scanner'); }}>
+                <Pressable
+                  style={styles.optionBtn}
+                  onPress={async () => {
+                    setShowScanOptions(false);
+                    const usage = await getUsageGateState();
+                    if (!usage.isUnlocked && usage.usedFreeScans >= usage.freeScanLimit) {
+                      openPaymentGate('Your 5 free scans are finished. Make the one-time payment to continue scanning.');
+                      return;
+                    }
+                    router.push('/scanner');
+                  }}
+                >
                     <View style={[styles.optionIcon, { backgroundColor: Palette.primary + '1A' }]}>
                         <Camera size={24} color={Palette.primary} />
                     </View>
@@ -278,7 +320,17 @@ export default function WelcomeScreen() {
         </View>
       )}
 
-      <BlurView intensity={20} style={styles.bottomBlur} tint="light" />
+      <UpgradeRequiredModal
+        visible={isUpgradeModalVisible}
+        message={upgradeMessage}
+        onClose={() => setIsUpgradeModalVisible(false)}
+        onOpenPayment={() => {
+          setIsUpgradeModalVisible(false);
+          router.push('/payment');
+        }}
+      />
+
+      <BlurView pointerEvents="none" intensity={20} style={[styles.bottomBlur, { height: 88 + insets.bottom }]} tint="light" />
     </View>
   );
 }
@@ -306,18 +358,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
+  userInfoPressable: {
+    alignSelf: 'flex-start',
+    borderRadius: Radius.xxl,
+  },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-  },
-  settingsBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   avatarContainer: {
     width: 44,

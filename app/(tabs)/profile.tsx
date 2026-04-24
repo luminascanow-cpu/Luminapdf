@@ -1,94 +1,95 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, RefreshControl } from 'react-native';
-import { Palette } from '../../constants/Theme';
-import { Shield, Cloud, HelpCircle, LogOut } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, Alert, Pressable, ScrollView, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { CreditCard, LogOut, RefreshCw } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Palette, Radius, Shadows } from '../../constants/Theme';
 import { supabase } from '../../lib/supabase';
-import { getDocumentsCount } from '../../lib/storage';
+import { getExportedDocumentsCount, isPaymentUnlocked } from '../../lib/storage';
+import { FREE_PAGE_LIMIT, FREE_SCAN_LIMIT } from '../../lib/paymentGate';
 
-// Sub-components
-import { ProfileHeader } from '../../components/profile/ProfileHeader';
-import { InfoSection } from '../../components/profile/InfoSection';
-import { SettingsMenu } from '../../components/profile/SettingsMenu';
-import { EditAccountModal } from '../../components/profile/EditAccountModal';
-
-interface UserProfile {
-  full_name: string | null;
-  avatar_url: string | null;
-  is_verified: boolean;
-  created_at: string | null;
-  updated_at?: string | null;
+interface ProfileState {
+  displayName: string;
+  email: string;
+  scannedCount: number;
+  isPaymentActive: boolean;
 }
 
-// Deterministic gradient colors from a string (for avatar fallback)
-function stringToColor(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const h = Math.abs(hash) % 360;
-  return `hsl(${h}, 60%, 50%)`;
-}
-
-function getInitials(name: string | null, email: string | null): string {
-  if (name && name.trim().length > 0) {
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    return parts[0][0].toUpperCase();
-  }
-  if (email) return email[0].toUpperCase();
-  return '?';
-}
+const EMPTY_PROFILE: ProfileState = {
+  displayName: 'User',
+  email: 'Not available',
+  scannedCount: 0,
+  isPaymentActive: false,
+};
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [email, setEmail] = useState<string | null>(null);
+  const [profile, setProfile] = useState<ProfileState>(EMPTY_PROFILE);
   const [isLoading, setIsLoading] = useState(true);
-  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  
-  const [isUpdating, setIsUpdating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [scannedCount, setScannedCount] = useState(0);
+  const [isSignOutModalVisible, setIsSignOutModalVisible] = useState(false);
 
-  const loadProfile = useCallback(async (shouldShowFullLoading = false) => {
-    if (shouldShowFullLoading) setIsLoading(true);
-    
+  const loadProfile = useCallback(async (showLoader = false) => {
+    if (showLoader) {
+      setIsLoading(true);
+    }
+
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        setProfile(null);
-        setEmail(null);
-        const count = await getDocumentsCount();
-        setScannedCount(count);
+      const [{ data: authData, error: authError }, scannedCount, paymentUnlocked] = await Promise.all([
+        supabase.auth.getUser(),
+        getExportedDocumentsCount(),
+        isPaymentUnlocked(),
+      ]);
+
+      const user = authData.user;
+      if (authError || !user) {
+        setProfile({
+          ...EMPTY_PROFILE,
+          scannedCount,
+          isPaymentActive: paymentUnlocked,
+        });
         return;
       }
 
-      setEmail(user.email ?? null);
+      const metadataName =
+        typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim().length > 0
+          ? user.user_metadata.full_name.trim()
+          : null;
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('full_name, avatar_url, is_verified, created_at')
-        .eq('id', user.id)
-        .single();
+      let profileName = metadataName;
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      if (!error && data) {
-        setProfile(data as UserProfile);
-      } else {
-        setProfile({
-          full_name: user.user_metadata?.full_name ?? null,
-          avatar_url: user.user_metadata?.avatar_url ?? null,
-          is_verified: false,
-          created_at: user.created_at ?? null,
-        });
+        if (data?.full_name && data.full_name.trim().length > 0) {
+          profileName = data.full_name.trim();
+        }
+      } catch (error) {
+        console.warn('Profile row lookup failed, using auth metadata instead.', error);
       }
-      
-      const count = await getDocumentsCount();
-      setScannedCount(count);
-    } catch (e) {
-      console.error('Failed to load profile:', e);
+
+      const email = user.email?.trim() || 'Not available';
+      setProfile({
+        displayName: profileName || email.split('@')[0] || 'User',
+        email,
+        scannedCount,
+        isPaymentActive: paymentUnlocked,
+      });
+    } catch (error) {
+      console.error('Failed to load profile screen:', error);
+      setProfile((prev) => ({
+        ...prev,
+        displayName: prev.displayName || 'User',
+        email: prev.email || 'Not available',
+        scannedCount: Number.isFinite(prev.scannedCount) ? prev.scannedCount : 0,
+        isPaymentActive: Boolean(prev.isPaymentActive),
+      }));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -97,116 +98,32 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (isEditModalVisible) return undefined;
-      void loadProfile(profile === null); // Only show full loader if profile is not yet loaded
+      void loadProfile(true);
       return undefined;
-    }, [isEditModalVisible, loadProfile, profile])
+    }, [loadProfile])
   );
 
-  const onRefresh = useCallback(() => {
+  const handleRefresh = () => {
     setIsRefreshing(true);
     void loadProfile(false);
-  }, [loadProfile]);
-
-  const openEditModal = () => {
-    setIsEditModalVisible(true);
   };
 
-  const handleUpdateAccount = async ({
-    nameInput,
-    emailInput,
-    newPassword,
-    confirmPassword,
-  }: {
-    nameInput: string;
-    emailInput: string;
-    newPassword: string;
-    confirmPassword: string;
-  }) => {
-    if (newPassword || confirmPassword) {
-      if (newPassword.length < 6) {
-        Alert.alert('Weak Password', 'New password must be at least 6 characters.');
-        return;
-      }
-      if (newPassword !== confirmPassword) {
-        Alert.alert('Password Mismatch', 'New password and confirm password do not match.');
-        return;
-      }
-    }
+  const handleSignOut = () => {
+    setIsSignOutModalVisible(true);
+  };
 
-    setIsUpdating(true);
+  const confirmSignOut = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not logged in');
-
-      if (nameInput.trim() !== (profile?.full_name || '')) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: user.id,
-            full_name: nameInput.trim(),
-            updated_at: new Date().toISOString(),
-          });
-        if (profileError) throw profileError;
-      }
-
-      const updateData: { email?: string; password?: string } = {};
-      if (emailInput.trim() && emailInput.trim() !== email) {
-        updateData.email = emailInput.trim();
-      }
-      if (newPassword) {
-        updateData.password = newPassword;
-      }
-
-      if (Object.keys(updateData).length > 0) {
-        const { error: authError } = await supabase.auth.updateUser(updateData);
-        if (authError) throw authError;
-
-        if (updateData.email) {
-          Alert.alert('Email Update', 'A confirmation link has been sent to your new email address.');
-        }
-      }
-
-      await loadProfile(false); // Silent refresh
-      setIsEditModalVisible(false);
-      Alert.alert('✅ Saved', 'Your information has been updated.');
-    } catch (e: any) {
-      Alert.alert('Update Failed', e.message || 'Check your internet connection.');
+      setIsSigningOut(true);
+      await supabase.auth.signOut();
+      setIsSignOutModalVisible(false);
+      router.replace('/login');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
     } finally {
-      setIsUpdating(false);
+      setIsSigningOut(false);
     }
   };
-
-  const handleSignOut = async () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            setIsSigningOut(true);
-            await supabase.auth.signOut();
-            router.replace('/login');
-          } catch (e) {
-            Alert.alert('Error', 'Failed to sign out. Please try again.');
-          } finally {
-            setIsSigningOut(false);
-          }
-        },
-      },
-    ]);
-  };
-
-  const lastSyncedText = profile?.updated_at 
-    ? `Last synced: ${new Date(profile.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    : 'Not connected';
-
-  const menuItems = [
-    { icon: Shield, label: 'Privacy & Security', sub: 'Biometric lock and data' },
-    { icon: Cloud, label: 'Cloud Sync', sub: lastSyncedText, action: () => onRefresh() },
-    { icon: HelpCircle, label: 'Support & Feedback', sub: 'Get help or request features' },
-  ];
 
   if (isLoading) {
     return (
@@ -217,77 +134,143 @@ export default function ProfileScreen() {
     );
   }
 
-  const joinDateFormatted = profile?.created_at
-    ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-    : null;
-
   return (
     <View style={styles.container}>
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent} 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={onRefresh}
-            colors={[Palette.primary]}
-            tintColor={Palette.primary}
-          />
-        }
+      <SafeAreaView edges={['top']} style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.headerCard}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{profile.displayName.charAt(0).toUpperCase()}</Text>
+            </View>
+            <Text style={styles.name}>{profile.displayName}</Text>
+            <Text style={styles.email}>{profile.email}</Text>
+
+            <View style={styles.statsRow}>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{profile.scannedCount}</Text>
+                <Text style={styles.statLabel}>Documents</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{profile.isPaymentActive ? 'Unlocked' : 'Free'}</Text>
+                <Text style={styles.statLabel}>Plan</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Payment & Access</Text>
+            <Text style={styles.sectionBody}>
+              {profile.isPaymentActive
+                ? 'Unlimited access is active on this device.'
+                : `Free access includes ${FREE_SCAN_LIMIT} completed scans and up to ${FREE_PAGE_LIMIT} pages in one scan session.`}
+            </Text>
+            <Pressable style={styles.primaryButton} onPress={() => router.push('/payment')}>
+              <CreditCard size={18} color="#FFF" />
+              <Text style={styles.primaryButtonText}>
+                {profile.isPaymentActive ? 'View Payment Access' : 'Open Payment Page'}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Actions</Text>
+            <Pressable
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+              onPress={handleRefresh}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? (
+                <ActivityIndicator size="small" color={Palette.primary} />
+              ) : (
+                <RefreshCw size={18} color={Palette.primary} />
+              )}
+              <Text style={styles.secondaryButtonText}>{isRefreshing ? 'Refreshing...' : 'Refresh Profile'}</Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [styles.logoutButton, pressed && styles.pressed]}
+              onPress={handleSignOut}
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? (
+                <ActivityIndicator size="small" color="#FF5A5A" />
+              ) : (
+                <LogOut size={18} color="#FF5A5A" />
+              )}
+              <Text style={styles.logoutText}>{isSigningOut ? 'Signing out...' : 'Sign Out'}</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+
+      <Modal
+        visible={isSignOutModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isSigningOut) {
+            setIsSignOutModalVisible(false);
+          }
+        }}
       >
-        <ProfileHeader 
-          displayName={profile?.full_name || (email ? email.split('@')[0] : 'User')}
-          email={email}
-          initials={getInitials(profile?.full_name ?? null, email)}
-          avatarColor={stringToColor(email ?? 'user')}
-          avatarUrl={profile?.avatar_url ?? null}
-          isVerified={profile?.is_verified ?? false}
-          joinDate={joinDateFormatted}
-          scannedCount={scannedCount}
-          onEditPress={openEditModal}
-        />
-
-        <View style={styles.contentPadding}>
-          <Text style={styles.sectionHeader}>Basic Information</Text>
-          <InfoSection 
-            fullName={profile?.full_name ?? null}
-            email={email}
-            onEditPress={openEditModal}
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              if (!isSigningOut) {
+                setIsSignOutModalVisible(false);
+              }
+            }}
           />
 
-          <Text style={styles.sectionHeader}>Settings & Preferences</Text>
-          <SettingsMenu items={menuItems} />
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconWrap}>
+              <LogOut size={22} color="#FFF" />
+            </View>
+            <Text style={styles.modalTitle}>Sign Out?</Text>
+            <Text style={styles.modalBody}>
+              You will need to sign in again to access your scans and account settings.
+            </Text>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.modalSecondaryButton,
+                  (pressed || isSigningOut) && styles.pressed,
+                ]}
+                onPress={() => setIsSignOutModalVisible(false)}
+                disabled={isSigningOut}
+              >
+                <Text style={styles.modalSecondaryText}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.modalPrimaryButton,
+                  (pressed || isSigningOut) && styles.pressed,
+                ]}
+                onPress={() => void confirmSignOut()}
+                disabled={isSigningOut}
+              >
+                <LinearGradient
+                  colors={['#C5164E', '#FF7A45']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.modalPrimaryGradient}
+                >
+                  {isSigningOut ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.modalPrimaryText}>Sign Out</Text>
+                  )}
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </View>
         </View>
-
-        <Pressable
-          style={({ pressed }) => [styles.logoutBtn, pressed && { opacity: 0.7 }]}
-          onPress={handleSignOut}
-          disabled={isSigningOut}
-        >
-          {isSigningOut ? (
-            <ActivityIndicator size="small" color="#FF5A5A" />
-          ) : (
-            <LogOut size={20} color="#FF5A5A" />
-          )}
-          <Text style={styles.logoutText}>{isSigningOut ? 'Signing out...' : 'Sign Out'}</Text>
-        </Pressable>
-
-        <View style={styles.footer}>
-          <Text style={styles.versionText}>LuminaScan v1.0.5</Text>
-          <Text style={styles.footerBrand}>Powered by Archivist AI</Text>
-        </View>
-      </ScrollView>
-
-        <EditAccountModal
-          visible={isEditModalVisible}
-          onClose={() => setIsEditModalVisible(false)}
-          onSave={handleUpdateAccount}
-          isUpdating={isUpdating}
-          initialName={profile?.full_name || ''}
-          initialEmail={email || ''}
-        />
-      </View>
-    );
+      </Modal>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -295,10 +278,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Palette.background,
   },
+  safeArea: {
+    flex: 1,
+  },
   loadingState: {
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
+    gap: 14,
   },
   loadingText: {
     fontFamily: 'Manrope-Medium',
@@ -306,56 +292,210 @@ const styles = StyleSheet.create({
     color: Palette.onSurfaceVariant,
   },
   scrollContent: {
+    padding: 20,
     paddingBottom: 120,
+    gap: 18,
   },
-  contentPadding: {
-    paddingHorizontal: 24,
-    marginTop: 32,
+  headerCard: {
+    backgroundColor: Palette.surfaceContainerLowest,
+    borderRadius: Radius.xxxl,
+    padding: 24,
+    alignItems: 'center',
+    ...Shadows.ambient,
   },
-  sectionHeader: {
-    fontFamily: 'PlusJakartaSans-Bold',
-    fontSize: 14,
-    color: Palette.primary,
-    marginBottom: 16,
-    marginTop: 24,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
-  logoutBtn: {
-    flexDirection: 'row',
+  avatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Palette.primary,
+  },
+  avatarText: {
+    fontFamily: 'PlusJakartaSans-ExtraBold',
+    fontSize: 34,
+    color: '#FFF',
+  },
+  name: {
+    marginTop: 16,
+    fontFamily: 'PlusJakartaSans-ExtraBold',
+    fontSize: 24,
+    color: Palette.onSurface,
+  },
+  email: {
+    marginTop: 6,
+    fontFamily: 'Manrope-Medium',
+    fontSize: 14,
+    color: Palette.onSurfaceVariant,
+  },
+  statsRow: {
+    flexDirection: 'row',
     gap: 12,
-    marginTop: 32,
-    marginHorizontal: 24,
-    paddingVertical: 18,
-    backgroundColor: 'rgba(255, 90, 90, 0.05)',
+    marginTop: 22,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: 120,
+    backgroundColor: Palette.surfaceContainerLow,
     borderRadius: Radius.xxl,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 90, 90, 0.1)',
-  },
-  logoutText: {
-    fontFamily: 'PlusJakartaSans-Bold',
-    fontSize: 16,
-    color: '#FF5A5A',
-  },
-  footer: {
+    paddingVertical: 16,
+    paddingHorizontal: 18,
     alignItems: 'center',
-    marginTop: 48,
   },
-  versionText: {
+  statValue: {
+    fontFamily: 'PlusJakartaSans-ExtraBold',
+    fontSize: 20,
+    color: Palette.onSurface,
+  },
+  statLabel: {
+    marginTop: 4,
     fontFamily: 'Manrope-Bold',
     fontSize: 11,
     color: Palette.onSurfaceVariant,
-    opacity: 0.5,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  footerBrand: {
+  sectionCard: {
+    backgroundColor: Palette.surfaceContainerLowest,
+    borderRadius: Radius.xxxl,
+    padding: 20,
+    ...Shadows.ambient,
+  },
+  sectionTitle: {
     fontFamily: 'PlusJakartaSans-Bold',
-    fontSize: 12,
+    fontSize: 16,
+    color: Palette.onSurface,
+  },
+  sectionBody: {
+    marginTop: 10,
+    fontFamily: 'Manrope-Medium',
+    fontSize: 14,
+    lineHeight: 22,
+    color: Palette.onSurfaceVariant,
+  },
+  primaryButton: {
+    marginTop: 18,
+    minHeight: 52,
+    borderRadius: Radius.xxl,
+    backgroundColor: Palette.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  primaryButtonText: {
+    fontFamily: 'PlusJakartaSans-Bold',
+    fontSize: 15,
+    color: '#FFF',
+  },
+  secondaryButton: {
+    marginTop: 16,
+    minHeight: 50,
+    borderRadius: Radius.xxl,
+    backgroundColor: Palette.surfaceContainerLow,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  secondaryButtonText: {
+    fontFamily: 'PlusJakartaSans-Bold',
+    fontSize: 15,
     color: Palette.primary,
-    marginTop: 8,
-    opacity: 0.8,
+  },
+  logoutButton: {
+    marginTop: 12,
+    minHeight: 50,
+    borderRadius: Radius.xxl,
+    backgroundColor: 'rgba(255, 90, 90, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 90, 90, 0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  logoutText: {
+    fontFamily: 'PlusJakartaSans-Bold',
+    fontSize: 15,
+    color: '#FF5A5A',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(11, 16, 30, 0.48)',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: Palette.surfaceContainerLowest,
+    borderRadius: Radius.xxxl,
+    padding: 22,
+    alignItems: 'center',
+    ...Shadows.ambient,
+  },
+  modalIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Palette.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalTitle: {
+    marginTop: 16,
+    fontFamily: 'PlusJakartaSans-ExtraBold',
+    fontSize: 24,
+    color: Palette.onSurface,
+  },
+  modalBody: {
+    marginTop: 10,
+    fontFamily: 'Manrope-Medium',
+    fontSize: 14,
+    lineHeight: 22,
+    color: Palette.onSurfaceVariant,
+    textAlign: 'center',
+  },
+  modalActions: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 22,
+  },
+  modalSecondaryButton: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: Radius.xxl,
+    backgroundColor: Palette.surfaceContainerLow,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSecondaryText: {
+    fontFamily: 'PlusJakartaSans-Bold',
+    fontSize: 15,
+    color: Palette.onSurface,
+  },
+  modalPrimaryButton: {
+    flex: 1,
+    borderRadius: Radius.xxl,
+    overflow: 'hidden',
+  },
+  modalPrimaryGradient: {
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalPrimaryText: {
+    fontFamily: 'PlusJakartaSans-Bold',
+    fontSize: 15,
+    color: '#FFF',
+  },
+  pressed: {
+    opacity: 0.78,
   },
 });

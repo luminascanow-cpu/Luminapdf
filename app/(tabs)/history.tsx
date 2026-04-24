@@ -1,14 +1,13 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, FlatList, Platform, ActivityIndicator, Dimensions, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList, Platform, ActivityIndicator, Dimensions, Alert, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Palette, Radius, Shadows } from '../../constants/Theme';
-import { ChevronLeft, FileImage, FileDigit, Search, Filter, Trash2, MoreVertical, LayoutGrid, List } from 'lucide-react-native';
+import { ChevronLeft, FileImage, FileDigit, FileText, Search, Trash2, LayoutGrid, List } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Document, getDocuments, deleteDocument } from '../../lib/storage';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
-import * as Linking from 'expo-linking';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const { width } = Dimensions.get('window');
 
@@ -18,6 +17,8 @@ const getDocumentColor = (type: string) => {
       return Palette.secondary;
     case 'JPG':
       return Palette.tertiary;
+    case 'TXT':
+      return '#7986CB';
     default:
       return Palette.primary;
   }
@@ -30,7 +31,7 @@ export default function HistoryScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'PDF' | 'JPG'>('ALL');
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'PDF' | 'JPG' | 'TXT'>('ALL');
 
   const loadDocuments = useCallback(async () => {
     try {
@@ -42,6 +43,8 @@ export default function HistoryScreen() {
       applyFilters(exportedOnly, searchQuery, activeFilter);
     } catch (error) {
       console.error('Failed to load documents:', error);
+      setDocuments([]);
+      setFilteredDocs([]);
     } finally {
       setIsLoading(false);
     }
@@ -56,7 +59,10 @@ export default function HistoryScreen() {
   const applyFilters = (docs: Document[], query: string, filter: string) => {
     let result = docs;
     if (query) {
-      result = docs.filter(doc => doc.name.toLowerCase().includes(query.toLowerCase()));
+      const loweredQuery = query.toLowerCase();
+      result = docs.filter((doc) =>
+        String(doc.name || '').toLowerCase().includes(loweredQuery)
+      );
     }
     if (filter !== 'ALL') {
       result = result.filter(doc => doc.type === filter);
@@ -69,13 +75,18 @@ export default function HistoryScreen() {
     applyFilters(documents, query, activeFilter);
   };
 
-  const onFilterChange = (filter: 'ALL' | 'PDF' | 'JPG') => {
+  const onFilterChange = (filter: 'ALL' | 'PDF' | 'JPG' | 'TXT') => {
     setActiveFilter(filter);
     applyFilters(documents, searchQuery, filter);
   };
 
   const openDocument = async (doc: Document) => {
     try {
+      if (!doc.uri) {
+        Alert.alert('File Missing', 'This scan does not have a valid file path.');
+        return;
+      }
+
       const info = await FileSystem.getInfoAsync(doc.uri);
 
       if (!info.exists) {
@@ -83,16 +94,8 @@ export default function HistoryScreen() {
         return;
       }
 
-      const encodedUri = doc.uri.includes(' ') ? encodeURI(doc.uri) : doc.uri;
-      try {
-        await Linking.openURL(encodedUri);
-        return;
-      } catch (linkingError) {
-        console.warn('Direct open failed, falling back to sharing.', linkingError);
-      }
-
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(encodedUri, {
+        await Sharing.shareAsync(doc.uri, {
           dialogTitle: doc.name,
         });
         return;
@@ -128,14 +131,13 @@ export default function HistoryScreen() {
   };
 
   const renderDocPreview = (item: Document) => {
-    if (item.type === 'JPG') {
-      return <Image source={{ uri: item.uri }} style={styles.cardImage} />;
-    }
     return (
       <View style={styles.filePreview}>
         <View style={[styles.filePreviewIconBox, { backgroundColor: getDocumentColor(item.type) + '1A' }]}>
           {item.type === 'PDF' ? (
             <FileDigit size={40} color={getDocumentColor(item.type)} />
+          ) : item.type === 'TXT' ? (
+            <FileText size={40} color={getDocumentColor(item.type)} />
           ) : (
             <FileImage size={40} color={getDocumentColor(item.type)} />
           )}
@@ -203,7 +205,7 @@ export default function HistoryScreen() {
         </View>
 
         <View style={styles.filterRow}>
-          {(['ALL', 'PDF', 'JPG'] as const).map((filter) => (
+          {(['ALL', 'PDF', 'JPG', 'TXT'] as const).map((filter) => (
             <Pressable
               key={filter}
               style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
@@ -226,7 +228,7 @@ export default function HistoryScreen() {
         <FlatList
           key={viewMode} // Force re-render on orientation change
           data={filteredDocs}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => String(item.id)}
           renderItem={renderDocItem}
           numColumns={viewMode === 'grid' ? 2 : 1}
           contentContainerStyle={styles.listContent}

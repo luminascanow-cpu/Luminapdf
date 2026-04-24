@@ -10,6 +10,8 @@ import { optimizeImages } from '../lib/imageOptimizer';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { FREE_PAGE_LIMIT, getUsageGateState } from '../lib/paymentGate';
+import { UpgradeRequiredModal } from '../components/UpgradeRequiredModal';
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
@@ -31,6 +33,8 @@ export default function ScannerScreen() {
   const isCapturingRef = useRef(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0.05)).current;
+  const [upgradeMessage, setUpgradeMessage] = useState('');
+  const [isUpgradeModalVisible, setIsUpgradeModalVisible] = useState(false);
 
   const animateProgress = (toValue: number, duration = 500) => {
     Animated.timing(progressAnim, {
@@ -40,11 +44,39 @@ export default function ScannerScreen() {
     }).start();
   };
 
+  const existingPageCount = existingImages ? (() => {
+    try {
+      const parsed = JSON.parse(existingImages) as string[];
+      return Array.isArray(parsed) ? parsed.length : 0;
+    } catch {
+      return 0;
+    }
+  })() : 0;
+
+  const openPaymentGate = (message: string) => {
+    setUpgradeMessage(message);
+    setIsUpgradeModalVisible(true);
+  };
+
   const startScan = async () => {
     if (isCapturingRef.current) return;
     isCapturingRef.current = true;
 
     try {
+      const usage = await getUsageGateState();
+      const isExistingSession = Boolean(sessionName || draftId || existingPageCount > 0);
+
+      if (!usage.isUnlocked && !isExistingSession && usage.usedFreeScans >= usage.freeScanLimit) {
+        openPaymentGate('Your 5 free scans are finished. Make the one-time payment to continue scanning.');
+        return;
+      }
+
+      const remainingFreePages = usage.isUnlocked ? 24 : Math.max(0, FREE_PAGE_LIMIT - existingPageCount);
+      if (!usage.isUnlocked && remainingFreePages <= 0) {
+        openPaymentGate(`Free access allows up to ${FREE_PAGE_LIMIT} pages in one scan session. Unlock full access to add more pages.`);
+        return;
+      }
+
       if (!cameraPermission?.granted) {
         const permission = await requestCameraPermission();
         if (!permission.granted) {
@@ -58,7 +90,11 @@ export default function ScannerScreen() {
       setSubMessage('Calibrating computer vision');
       animateProgress(0.2, 800);
 
-      const pageLimit = captureMode === 'single' ? 1 : 24;
+      const pageLimit = captureMode === 'single'
+        ? 1
+        : usage.isUnlocked
+          ? 24
+          : Math.min(FREE_PAGE_LIMIT, remainingFreePages);
       const result = await scanDocumentWithBestAvailableScanner(pageLimit);
 
       if (result.status === 'cancel') {
@@ -155,6 +191,14 @@ export default function ScannerScreen() {
 
   const handleLibraryImport = async () => {
     try {
+      const usage = await getUsageGateState();
+      const isExistingSession = Boolean(sessionName || draftId || existingPageCount > 0);
+
+      if (!usage.isUnlocked && !isExistingSession && usage.usedFreeScans >= usage.freeScanLimit) {
+        openPaymentGate('Your 5 free scans are finished. Make the one-time payment to continue scanning.');
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
@@ -162,10 +206,18 @@ export default function ScannerScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
+        const totalPageCount = existingPageCount + result.assets.length;
+        if (!usage.isUnlocked && totalPageCount > FREE_PAGE_LIMIT) {
+          openPaymentGate(`Free access allows up to ${FREE_PAGE_LIMIT} pages in one scan session. Unlock full access to import more pages.`);
+          return;
+        }
+
         setIsCapturing(true);
         setStatusMessage('Importing...');
+        setSubMessage(`Optimizing ${result.assets.length} page${result.assets.length > 1 ? 's' : ''}`);
         
         const uris = result.assets.map(asset => asset.uri);
+        const optimizedUris = await optimizeImages(uris);
         
         // Extract name
         let initialName = 'Imported Scan';
@@ -180,7 +232,7 @@ export default function ScannerScreen() {
         router.push({
           pathname: '/preview',
           params: { 
-            imageUris: JSON.stringify(uris),
+            imageUris: JSON.stringify(optimizedUris),
             initialName: sessionName || initialName,
             resumeSession: sessionName ? '1' : '0',
             draftId,
@@ -362,6 +414,16 @@ export default function ScannerScreen() {
           </View>
         </View>
       </SafeAreaView>
+
+      <UpgradeRequiredModal
+        visible={isUpgradeModalVisible}
+        message={upgradeMessage}
+        onClose={() => setIsUpgradeModalVisible(false)}
+        onOpenPayment={() => {
+          setIsUpgradeModalVisible(false);
+          router.push('/payment');
+        }}
+      />
     </View>
   );
 }

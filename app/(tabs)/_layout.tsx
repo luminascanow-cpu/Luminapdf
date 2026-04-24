@@ -1,15 +1,24 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, Platform, View } from 'react-native';
-import { LayoutGrid, Search, FileText, User } from 'lucide-react-native';
-import { Palette, Radius } from '../../constants/Theme';
+import { Search, FileText, User } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 20 : 14);
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: 62 + bottomInset,
+            paddingBottom: bottomInset,
+          },
+        ],
         tabBarShowLabel: true,
         tabBarActiveTintColor: '#FFF',
         tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.4)',
@@ -23,21 +32,6 @@ export default function TabLayout() {
         ),
       }}
     >
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: 'Library',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={focused && styles.activeIconWrap}>
-              <LayoutGrid 
-                size={22} 
-                color={color} 
-                strokeWidth={focused ? 2.5 : 2} 
-              />
-            </View>
-          ),
-        }}
-      />
       <Tabs.Screen
         name="search"
         options={{
@@ -93,12 +87,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: Platform.OS === 'ios' ? 94 : 72,
     backgroundColor: 'rgba(6, 14, 32, 0.85)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
     elevation: 0,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 12,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     overflow: 'hidden',

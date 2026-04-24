@@ -14,6 +14,45 @@ export interface Document {
 }
 
 const db = SQLite.openDatabaseSync('luminascan.db');
+const PAYMENT_UNLOCK_KEY = 'payment_unlocked';
+
+const normalizeDocument = (row: any): Document | null => {
+  const id = Number(row?.id);
+  if (!Number.isFinite(id)) {
+    return null;
+  }
+
+  const name = typeof row?.name === 'string' && row.name.trim().length > 0
+    ? row.name
+    : 'Untitled Document';
+  const type = typeof row?.type === 'string' && row.type.trim().length > 0
+    ? row.type
+    : 'PDF';
+  const uri = typeof row?.uri === 'string' ? row.uri : '';
+  const date = typeof row?.date === 'string' && row.date.trim().length > 0
+    ? row.date
+    : 'Unknown date';
+  const size = typeof row?.size === 'string' && row.size.trim().length > 0
+    ? row.size
+    : 'Unknown size';
+  const pagesValue = row?.pages;
+  const pages =
+    typeof pagesValue === 'number' || typeof pagesValue === 'string'
+      ? pagesValue
+      : '1';
+  const status: DocumentStatus = row?.status === 'DRAFT' ? 'DRAFT' : 'EXPORTED';
+
+  return {
+    id,
+    name,
+    type,
+    uri,
+    date,
+    size,
+    pages,
+    status,
+  };
+};
 
 export const initDatabase = async () => {
   // Create table
@@ -29,6 +68,10 @@ export const initDatabase = async () => {
       pages TEXT NOT NULL,
       status TEXT DEFAULT 'EXPORTED'
     );
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY NOT NULL,
+      value TEXT NOT NULL
+    );
   `);
 
   // Migration: Ensure status column exists if the table was created before
@@ -38,6 +81,21 @@ export const initDatabase = async () => {
   if (!hasStatusColumn) {
     await db.execAsync(`ALTER TABLE documents ADD COLUMN status TEXT DEFAULT 'EXPORTED'`);
   }
+};
+
+const getAppSetting = async (key: string): Promise<string | null> => {
+  const result = await db.getFirstAsync<{ value: string }>(
+    'SELECT value FROM app_settings WHERE key = ?',
+    [key]
+  );
+  return result?.value ?? null;
+};
+
+const setAppSetting = async (key: string, value: string) => {
+  await db.runAsync(
+    'INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)',
+    [key, value]
+  );
 };
 
 export const saveDocument = async (doc: Omit<Document, 'id'>): Promise<Document> => {
@@ -71,12 +129,30 @@ export const updateDocument = async (id: number, doc: Partial<Omit<Document, 'id
 
 export const getDocuments = async (): Promise<Document[]> => {
   const allRows = await db.getAllAsync('SELECT * FROM documents ORDER BY id DESC');
-  return allRows as Document[];
+  return allRows
+    .map((row) => normalizeDocument(row))
+    .filter((row): row is Document => row !== null);
 };
 
 export const getDocumentsCount = async (): Promise<number> => {
   const result = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM documents');
   return result?.count ?? 0;
+};
+
+export const getExportedDocumentsCount = async (): Promise<number> => {
+  const result = await db.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) as count FROM documents WHERE status = 'EXPORTED'"
+  );
+  return result?.count ?? 0;
+};
+
+export const isPaymentUnlocked = async (): Promise<boolean> => {
+  const value = await getAppSetting(PAYMENT_UNLOCK_KEY);
+  return value === '1';
+};
+
+export const setPaymentUnlocked = async (unlocked: boolean) => {
+  await setAppSetting(PAYMENT_UNLOCK_KEY, unlocked ? '1' : '0');
 };
 
 export const deleteDocument = async (id: number) => {
