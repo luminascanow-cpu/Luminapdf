@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { supabase } from './supabase';
 
 export type DocumentStatus = 'DRAFT' | 'EXPORTED';
 
@@ -14,7 +15,6 @@ export interface Document {
 }
 
 const db = SQLite.openDatabaseSync('luminascan.db');
-const PAYMENT_UNLOCK_KEY = 'payment_unlocked';
 
 const normalizeDocument = (row: any): Document | null => {
   const id = Number(row?.id);
@@ -83,21 +83,6 @@ export const initDatabase = async () => {
   }
 };
 
-const getAppSetting = async (key: string): Promise<string | null> => {
-  const result = await db.getFirstAsync<{ value: string }>(
-    'SELECT value FROM app_settings WHERE key = ?',
-    [key]
-  );
-  return result?.value ?? null;
-};
-
-const setAppSetting = async (key: string, value: string) => {
-  await db.runAsync(
-    'INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)',
-    [key, value]
-  );
-};
-
 export const saveDocument = async (doc: Omit<Document, 'id'>): Promise<Document> => {
   const result = await db.runAsync(
     'INSERT INTO documents (name, type, uri, date, size, pages, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -146,13 +131,48 @@ export const getExportedDocumentsCount = async (): Promise<number> => {
   return result?.count ?? 0;
 };
 
-export const isPaymentUnlocked = async (): Promise<boolean> => {
-  const value = await getAppSetting(PAYMENT_UNLOCK_KEY);
-  return value === '1';
+const getCurrentUserId = async (): Promise<string | null> => {
+  try {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (!sessionError && sessionData.session?.user?.id) {
+      return sessionData.session.user.id;
+    }
+
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user?.id) {
+      return null;
+    }
+
+    return data.user.id;
+  } catch (error) {
+    console.warn('Failed to resolve current user for payment gate.', error);
+    return null;
+  }
 };
 
-export const setPaymentUnlocked = async (unlocked: boolean) => {
-  await setAppSetting(PAYMENT_UNLOCK_KEY, unlocked ? '1' : '0');
+export const isPaymentUnlocked = async (): Promise<boolean> => {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return false;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('payment_access')
+      .select('is_unlocked')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Failed to resolve payment access from Supabase.', error);
+      return false;
+    }
+
+    return data?.is_unlocked === true;
+  } catch (error) {
+    console.warn('Payment access lookup failed.', error);
+    return false;
+  }
 };
 
 export const deleteDocument = async (id: number) => {

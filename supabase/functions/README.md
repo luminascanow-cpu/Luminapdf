@@ -1,5 +1,9 @@
 ## Razorpay Edge Functions
 
+Before deploying the functions, run the SQL in:
+
+- `supabase/migrations/20260425_secure_payment_access.sql`
+
 Set these secrets before deploying:
 
 - `RAZORPAY_KEY_ID`
@@ -8,8 +12,8 @@ Set these secrets before deploying:
 Suggested commands:
 
 ```bash
-supabase secrets set RAZORPAY_KEY_ID=rzp_test_SgyWXbGQ9WGZkR
-supabase secrets set RAZORPAY_KEY_SECRET=GCyGppZKvZnhmTXN0x0YOrfj
+supabase secrets set RAZORPAY_KEY_ID=your_key_id
+supabase secrets set RAZORPAY_KEY_SECRET=your_key_secret
 supabase functions deploy razorpay-create-payment-link
 supabase functions deploy razorpay-verify-payment
 ```

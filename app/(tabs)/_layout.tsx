@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, Platform, View } from 'react-native';
-import { Search, FileText, User } from 'lucide-react-native';
+import { FileText, User } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName="history"
       screenOptions={{
         headerShown: false,
         tabBarStyle: [
@@ -32,21 +33,6 @@ export default function TabLayout() {
         ),
       }}
     >
-      <Tabs.Screen
-        name="search"
-        options={{
-          title: 'Search',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={focused && styles.activeIconWrap}>
-              <Search 
-                size={22} 
-                color={color} 
-                strokeWidth={focused ? 2.5 : 2} 
-              />
-            </View>
-          ),
-        }}
-      />
       <Tabs.Screen
         name="history"
         options={{

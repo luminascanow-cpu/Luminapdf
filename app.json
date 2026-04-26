@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "LuminaScanApp",
+    "name": "Lumina Scan",
     "slug": "LuminaScanApp",
     "scheme": "lumina-scan",
     "owner": "jay271987",
@@ -8,7 +8,7 @@
     "orientation": "portrait",
     "icon": "./assets/app-logo.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/app-logo.png",
       "resizeMode": "contain",
@@ -18,7 +18,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "LuminaScan needs access to your camera to scan documents."
-      }
+      },
+      "bundleIdentifier": "com.lumina.scanapp"
     },
     "android": {
       "package": "com.lumina.scanapp",
@@ -32,7 +33,10 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.READ_MEDIA_VIDEO"
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_AUDIO"
       ],
       "edgeToEdgeEnabled": true
     },
@@ -42,7 +46,8 @@
       "expo-sqlite",
       "expo-router",
       "expo-font",
-      "expo-media-library"
+      "expo-media-library",
+      "@sentry/react-native/expo"
     ],
     "extra": {
       "router": {},

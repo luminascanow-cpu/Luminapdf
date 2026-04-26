@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, Pressable, ScrollView, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -9,6 +9,7 @@ import { Palette, Radius, Shadows } from '../../constants/Theme';
 import { supabase } from '../../lib/supabase';
 import { getExportedDocumentsCount, isPaymentUnlocked } from '../../lib/storage';
 import { FREE_PAGE_LIMIT, FREE_SCAN_LIMIT } from '../../lib/paymentGate';
+import { useAuth } from '../../hooks/useAuth';
 
 interface ProfileState {
   displayName: string;
@@ -26,6 +27,7 @@ const EMPTY_PROFILE: ProfileState = {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<ProfileState>(EMPTY_PROFILE);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -38,14 +40,12 @@ export default function ProfileScreen() {
     }
 
     try {
-      const [{ data: authData, error: authError }, scannedCount, paymentUnlocked] = await Promise.all([
-        supabase.auth.getUser(),
+      const [scannedCount, paymentUnlocked] = await Promise.all([
         getExportedDocumentsCount(),
         isPaymentUnlocked(),
       ]);
 
-      const user = authData.user;
-      if (authError || !user) {
+      if (!user) {
         setProfile({
           ...EMPTY_PROFILE,
           scannedCount,
@@ -94,7 +94,7 @@ export default function ProfileScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [user]);
 
   useFocusEffect(
     useCallback(() => {
@@ -102,6 +102,11 @@ export default function ProfileScreen() {
       return undefined;
     }, [loadProfile])
   );
+
+  useEffect(() => {
+    setProfile(EMPTY_PROFILE);
+    void loadProfile(true);
+  }, [loadProfile, user?.id]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -161,7 +166,7 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitle}>Payment & Access</Text>
             <Text style={styles.sectionBody}>
               {profile.isPaymentActive
-                ? 'Unlimited access is active on this device.'
+                ? 'Unlimited access is active for this account.'
                 : `Free access includes ${FREE_SCAN_LIMIT} completed scans and up to ${FREE_PAGE_LIMIT} pages in one scan session.`}
             </Text>
             <Pressable style={styles.primaryButton} onPress={() => router.push('/payment')}>

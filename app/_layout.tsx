@@ -5,14 +5,17 @@ import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, Plus
 import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold } from '@expo-google-fonts/manrope';
 import { StatusBar } from 'expo-status-bar';
 import { Image, Text, View } from 'react-native';
+import { useRouter, useSegments } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { initDatabase } from '../lib/storage';
-import { useAuth } from '../hooks/useAuth';
+import { AuthProvider, useAuth } from '../hooks/useAuth';
 import { useHeartbeat } from '../hooks/useHeartbeat';
 import { Gradients } from '../constants/Theme';
+import { initSentry } from '../lib/sentry';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
+initSentry();
 
 function BootSplash() {
   return (
@@ -71,11 +74,6 @@ function BootSplash() {
 }
 
 export default function RootLayout() {
-  const { initialized, session } = useAuth();
-  
-  // Custom hook for background focus tracking
-  useHeartbeat(initialized, session);
-  
   const [loaded, error] = useFonts({
     'PlusJakartaSans-Regular': PlusJakartaSans_400Regular,
     'PlusJakartaSans-SemiBold': PlusJakartaSans_600SemiBold,
@@ -105,6 +103,39 @@ export default function RootLayout() {
   if (!loaded && !error) {
     return <BootSplash />;
   }
+
+  return (
+    <AuthProvider>
+      <RootNavigator />
+    </AuthProvider>
+  );
+}
+
+function RootNavigator() {
+  const { initialized, session } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
+  const topSegment = segments[0] ?? '';
+  const isPublicRoute =
+    topSegment === 'login' || topSegment === 'auth' || topSegment === 'reset-password';
+  
+  // Custom hook for background focus tracking
+  useHeartbeat(initialized, session);
+
+  useEffect(() => {
+    if (!initialized) {
+      return;
+    }
+
+    if (!session && !isPublicRoute) {
+      router.replace('/login');
+      return;
+    }
+
+    if (session && (topSegment === '' || topSegment === 'login' || topSegment === 'auth')) {
+      router.replace('/');
+    }
+  }, [initialized, isPublicRoute, router, session, topSegment]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f6f6ff' }}>

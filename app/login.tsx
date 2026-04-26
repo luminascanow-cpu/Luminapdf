@@ -32,8 +32,6 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSendingReset, setIsSendingReset] = useState(false);
-  const [isSignupSuccessVisible, setIsSignupSuccessVisible] = useState(false);
-  const [signupSuccessEmail, setSignupSuccessEmail] = useState('');
   const [isResetFeedbackVisible, setIsResetFeedbackVisible] = useState(false);
   const [resetFeedbackTitle, setResetFeedbackTitle] = useState('');
   const [resetFeedbackMessage, setResetFeedbackMessage] = useState('');
@@ -77,7 +75,6 @@ export default function LoginScreen() {
 
         if (error) throw error;
       } else {
-        const redirectUrl = getAuthRedirectUrl();
         const { data, error } = await supabase.auth.signUp({
           email: cleanEmail,
           password,
@@ -85,7 +82,6 @@ export default function LoginScreen() {
             data: {
               full_name: fullName.trim(),
             },
-            emailRedirectTo: redirectUrl,
           },
         });
 
@@ -100,10 +96,16 @@ export default function LoginScreen() {
         }
 
         if (!data.session) {
-          setSignupSuccessEmail(cleanEmail);
-          setIsSignupSuccessVisible(true);
-          setMode('sign-in');
-          return;
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password,
+          });
+
+          if (signInError) {
+            throw new Error(
+              'Signup completed, but automatic sign-in is blocked. Turn off email confirmation in Supabase Authentication > Providers > Email.'
+            );
+          }
         }
       }
     } catch (error: any) {
@@ -332,57 +334,6 @@ export default function LoginScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-
-      <Modal
-        visible={isSignupSuccessVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsSignupSuccessVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setIsSignupSuccessVisible(false)}
-          />
-
-          <View style={styles.modalCard}>
-            <LinearGradient
-              colors={Gradients.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.modalHero}
-            >
-              <View style={styles.modalIconWrap}>
-                <MailCheck size={24} color="#FFF" />
-              </View>
-              <Text style={styles.modalTitle}>Check Your Email</Text>
-              <Text style={styles.modalSubtitle}>
-                We sent a confirmation link to {signupSuccessEmail || 'your inbox'}.
-              </Text>
-            </LinearGradient>
-
-            <View style={styles.modalBody}>
-              <Text style={styles.modalBodyText}>
-                Open the email on this device, confirm your account, and LuminaScan will take you back into the app.
-              </Text>
-
-              <Pressable
-                style={({ pressed }) => [styles.modalPrimaryButton, pressed && { opacity: 0.88 }]}
-                onPress={() => setIsSignupSuccessVisible(false)}
-              >
-                <LinearGradient
-                  colors={Gradients.accent}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.modalPrimaryGradient}
-                >
-                  <Text style={styles.modalPrimaryText}>Got It</Text>
-                </LinearGradient>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={isResetFeedbackVisible}

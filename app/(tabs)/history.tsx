@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList, Platform, ActivityIndicator, Dimensions, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList, Platform, ActivityIndicator, Dimensions, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Palette, Radius, Shadows } from '../../constants/Theme';
-import { ChevronLeft, FileImage, FileDigit, FileText, Search, Trash2, LayoutGrid, List } from 'lucide-react-native';
+import { ChevronLeft, FileImage, FileDigit, FileText, Trash2, LayoutGrid, List } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Document, getDocuments, deleteDocument } from '../../lib/storage';
 import * as Sharing from 'expo-sharing';
@@ -29,7 +29,6 @@ export default function HistoryScreen() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [filteredDocs, setFilteredDocs] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PDF' | 'JPG' | 'TXT'>('ALL');
 
@@ -40,7 +39,7 @@ export default function HistoryScreen() {
       // Only show exported (converted) documents
       const exportedOnly = storedDocuments.filter(d => d.status === 'EXPORTED');
       setDocuments(exportedOnly);
-      applyFilters(exportedOnly, searchQuery, activeFilter);
+      applyFilters(exportedOnly, activeFilter);
     } catch (error) {
       console.error('Failed to load documents:', error);
       setDocuments([]);
@@ -48,7 +47,7 @@ export default function HistoryScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, activeFilter]);
+  }, [activeFilter]);
 
   useFocusEffect(
     useCallback(() => {
@@ -56,28 +55,17 @@ export default function HistoryScreen() {
     }, [loadDocuments])
   );
 
-  const applyFilters = (docs: Document[], query: string, filter: string) => {
+  const applyFilters = (docs: Document[], filter: string) => {
     let result = docs;
-    if (query) {
-      const loweredQuery = query.toLowerCase();
-      result = docs.filter((doc) =>
-        String(doc.name || '').toLowerCase().includes(loweredQuery)
-      );
-    }
     if (filter !== 'ALL') {
       result = result.filter(doc => doc.type === filter);
     }
     setFilteredDocs(result);
   };
 
-  const onSearch = (query: string) => {
-    setSearchQuery(query);
-    applyFilters(documents, query, activeFilter);
-  };
-
   const onFilterChange = (filter: 'ALL' | 'PDF' | 'JPG' | 'TXT') => {
     setActiveFilter(filter);
-    applyFilters(documents, searchQuery, filter);
+    applyFilters(documents, filter);
   };
 
   const openDocument = async (doc: Document) => {
@@ -183,24 +171,16 @@ export default function HistoryScreen() {
           <Pressable style={styles.backBtn} onPress={() => router.back()}>
             <ChevronLeft size={24} color={Palette.onSurface} strokeWidth={2.5} />
           </Pressable>
-          <Text style={styles.headerTitle}>My Scans</Text>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>My Scans</Text>
+            <Pressable style={styles.closeBtn} onPress={() => router.replace('/')}>
+              <Text style={styles.closeBtnText}>Close</Text>
+            </Pressable>
+          </View>
           <View style={styles.headerTools}>
             <Pressable style={styles.toolBtn} onPress={() => setViewMode(prev => prev === 'grid' ? 'list' : 'grid')}>
               {viewMode === 'grid' ? <List size={20} color={Palette.onSurfaceVariant} /> : <LayoutGrid size={20} color={Palette.onSurfaceVariant} />}
             </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Search size={18} color={Palette.onSurfaceVariant} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search by filename..."
-              placeholderTextColor={Palette.onSurfaceVariant + '80'}
-              value={searchQuery}
-              onChangeText={onSearch}
-            />
           </View>
         </View>
 
@@ -222,7 +202,7 @@ export default function HistoryScreen() {
       {isLoading ? (
         <View style={styles.centerBox}>
           <ActivityIndicator color={Palette.primary} size="large" />
-          <Text style={styles.statusText}>Searching local storage...</Text>
+          <Text style={styles.statusText}>Loading your scans...</Text>
         </View>
       ) : filteredDocs.length > 0 ? (
         <FlatList
@@ -240,11 +220,9 @@ export default function HistoryScreen() {
           <View style={styles.emptyIconBox}>
             <FileDigit size={48} color={Palette.outlineVariant} opacity={0.3} />
           </View>
-          <Text style={styles.emptyTitle}>{searchQuery ? 'No Results' : 'No Local Scans'}</Text>
+          <Text style={styles.emptyTitle}>No Local Scans</Text>
           <Text style={styles.emptyText}>
-            {searchQuery 
-              ? 'Try a different keyword or filter.' 
-              : 'All your successfully completed scans will appear here automatically.'}
+            All your successfully completed scans will appear here automatically.
           </Text>
         </View>
       )}
@@ -280,7 +258,26 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans-Bold',
     fontSize: 20,
     color: Palette.onSurface,
-    marginLeft: -40, // Offset for centered title
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+  },
+  closeBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+    backgroundColor: Palette.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: Palette.outlineVariant + '1A',
+  },
+  closeBtnText: {
+    fontFamily: 'Manrope-Bold',
+    fontSize: 12,
+    color: Palette.onSurfaceVariant,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   headerTools: {
     flexDirection: 'row',
@@ -293,25 +290,6 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.surfaceContainerLow,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  searchContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Palette.surfaceContainerLow,
-    borderRadius: Radius.lg,
-    paddingHorizontal: 12,
-    gap: 10,
-    height: 48,
-  },
-  searchInput: {
-    flex: 1,
-    fontFamily: 'Manrope-Medium',
-    fontSize: 15,
-    color: Palette.onSurface,
   },
   filterRow: {
     flexDirection: 'row',

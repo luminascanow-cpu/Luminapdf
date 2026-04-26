@@ -1,14 +1,14 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator, ScrollView, Linking } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator, ScrollView, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, CheckCircle2, CreditCard, ShieldCheck, Sparkles } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, CreditCard, ShieldCheck, Sparkles, TriangleAlert } from 'lucide-react-native';
+import RazorpayCheckout from 'react-native-razorpay';
 import { Palette, Gradients, Radius, Shadows } from '../constants/Theme';
 import { FREE_PAGE_LIMIT, FREE_SCAN_LIMIT, ONE_TIME_PAYMENT_LABEL, getUsageGateState } from '../lib/paymentGate';
-import { setPaymentUnlocked } from '../lib/storage';
-import { createRazorpayPaymentLink, verifyRazorpayPaymentLink } from '../lib/razorpay';
+import { createRazorpayOrder, verifyRazorpayPayment } from '../lib/razorpay';
 import { useAuth } from '../hooks/useAuth';
 
 export default function PaymentScreen() {
@@ -20,7 +20,10 @@ export default function PaymentScreen() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [usedFreeScans, setUsedFreeScans] = useState(0);
   const [remainingFreeScans, setRemainingFreeScans] = useState(FREE_SCAN_LIMIT);
-  const [pendingPaymentLinkId, setPendingPaymentLinkId] = useState<string | null>(null);
+  const [isFailureModalVisible, setIsFailureModalVisible] = useState(false);
+  const [failureTitle, setFailureTitle] = useState('Payment Failed');
+  const [failureMessage, setFailureMessage] = useState('We could not complete the payment right now.');
+  const [failureHint, setFailureHint] = useState('Please try again in a moment.');
 
   const loadState = useCallback(async () => {
     try {
@@ -40,51 +43,137 @@ export default function PaymentScreen() {
     }, [loadState])
   );
 
-  const handlePayment = async () => {
-    try {
-      setIsPaying(true);
-      const paymentLink = await createRazorpayPaymentLink({
-        customerEmail: user?.email ?? null,
-        customerName: user?.user_metadata?.full_name ?? null,
-      });
+  useEffect(() => {
+    setIsUnlocked(false);
+    setUsedFreeScans(0);
+    setRemainingFreeScans(FREE_SCAN_LIMIT);
+    void loadState();
+  }, [loadState, user?.id]);
 
-      setPendingPaymentLinkId(paymentLink.paymentLinkId);
+  const showPaymentFailure = useCallback((title: string, message: string, hint: string) => {
+    setFailureTitle(title);
+    setFailureMessage(message);
+    setFailureHint(hint);
+    setIsFailureModalVisible(true);
+  }, []);
 
-      const canOpenCheckout = await Linking.canOpenURL(paymentLink.shortUrl);
-      if (!canOpenCheckout) {
-        throw new Error('This device could not open the Razorpay checkout link.');
-      }
+  const getPaymentFailureCopy = useCallback((error: any) => {
+    const description =
+      typeof error?.description === 'string' && error.description.trim().length > 0
+        ? error.description.trim()
+        : null;
+    const message =
+      typeof error?.message === 'string' && error.message.trim().length > 0
+        ? error.message.trim()
+        : null;
+    const rawError =
+      typeof error?.error === 'object' && error.error !== null
+        ? error.error
+        : null;
+    const reason =
+      typeof rawError?.reason === 'string' && rawError.reason.trim().length > 0
+        ? rawError.reason.trim()
+        : null;
+    const step =
+      typeof rawError?.step === 'string' && rawError.step.trim().length > 0
+        ? rawError.step.trim()
+        : null;
 
-      await Linking.openURL(paymentLink.shortUrl);
-    } catch (error: any) {
-      Alert.alert('Payment Failed', error?.message || 'We could not complete the payment right now.');
-    } finally {
-      setIsPaying(false);
+    const combined = `${description ?? ''} ${message ?? ''} ${reason ?? ''} ${step ?? ''}`.toLowerCase();
+
+    if (combined.includes('payment_cancelled') || combined.includes('payment cancelled')) {
+      return {
+        title: 'Payment Cancelled',
+        message: 'You closed the Razorpay checkout before completing payment.',
+        hint: 'Nothing was unlocked. You can start the payment again whenever you are ready.',
+      };
     }
-  };
 
-  const handleVerifyPayment = async () => {
-    if (!pendingPaymentLinkId) {
-      Alert.alert('No Payment In Progress', 'Start the Razorpay checkout first, then come back to verify it.');
+    if (combined.includes('network')) {
+      return {
+        title: 'Connection Problem',
+        message: 'We could not reach the payment service right now.',
+        hint: 'Please check your internet connection and try again.',
+      };
+    }
+
+    if (
+      combined.includes('bad_request_error') ||
+      combined.includes('payment_authentication') ||
+      combined.includes('payment_error')
+    ) {
+      return {
+        title: 'Payment Could Not Be Completed',
+        message: 'Razorpay could not finish this payment attempt.',
+        hint: 'Please retry or use a different payment method.',
+      };
+    }
+
+    if (description) {
+      return {
+        title: 'Payment Failed',
+        message: description,
+        hint: 'No premium access was unlocked for this attempt.',
+      };
+    }
+
+    if (message) {
+      return {
+        title: 'Payment Failed',
+        message,
+        hint: 'No premium access was unlocked for this attempt.',
+      };
+    }
+
+    return {
+      title: 'Payment Failed',
+      message: 'We could not complete the payment right now.',
+      hint: 'Please try again in a moment.',
+    };
+  }, []);
+
+  const handlePayment = async () => {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in before completing payment.');
       return;
     }
 
     try {
-      setIsVerifying(true);
-      const result = await verifyRazorpayPaymentLink(pendingPaymentLinkId);
+      setIsPaying(true);
+      const order = await createRazorpayOrder({
+        customerEmail: user?.email ?? null,
+        customerName: user?.user_metadata?.full_name ?? null,
+      });
 
-      if (!result.verified) {
-        Alert.alert(
-          'Payment Pending',
-          'Razorpay still shows this payment as pending. Complete the checkout, then tap verify again.'
-        );
-        return;
+      const result = await RazorpayCheckout.open({
+        amount: String(order.amount),
+        currency: order.currency,
+        description: order.description,
+        key: order.keyId,
+        name: order.name,
+        order_id: order.orderId,
+        prefill: {
+          email: user?.email ?? '',
+          name: user?.user_metadata?.full_name ?? '',
+        },
+        theme: {
+          color: Palette.primary,
+        },
+      });
+
+      setIsVerifying(true);
+      const verification = await verifyRazorpayPayment({
+        orderId: result.razorpay_order_id,
+        paymentId: result.razorpay_payment_id,
+        signature: result.razorpay_signature,
+      });
+
+      if (!verification.verified) {
+        throw new Error('Razorpay payment verification failed. Please contact support if payment was deducted.');
       }
 
-      await setPaymentUnlocked(true);
-      setIsUnlocked(true);
-      setPendingPaymentLinkId(null);
       await loadState();
+      setIsUnlocked(true);
 
       Alert.alert('Payment Successful', 'Your one-time unlock is active now.', [
         {
@@ -93,8 +182,11 @@ export default function PaymentScreen() {
         },
       ]);
     } catch (error: any) {
-      Alert.alert('Verification Failed', error?.message || 'We could not verify the Razorpay payment.');
+      await loadState();
+      const failureCopy = getPaymentFailureCopy(error);
+      showPaymentFailure(failureCopy.title, failureCopy.message, failureCopy.hint);
     } finally {
+      setIsPaying(false);
       setIsVerifying(false);
     }
   };
@@ -164,41 +256,26 @@ export default function PaymentScreen() {
         <View style={styles.metaRow}>
           <View style={styles.metaCard}>
             <CreditCard size={18} color={Palette.primary} />
-            <Text style={styles.metaLabel}>Razorpay hosted checkout</Text>
+            <Text style={styles.metaLabel}>Razorpay in-app checkout</Text>
           </View>
           <View style={styles.metaCard}>
             <ShieldCheck size={18} color={Palette.primary} />
-            <Text style={styles.metaLabel}>Verified before local unlock</Text>
+            <Text style={styles.metaLabel}>Server-verified payment</Text>
           </View>
         </View>
 
-        {pendingPaymentLinkId ? (
+        {!isUnlocked ? (
           <View style={styles.pendingCard}>
-            <Text style={styles.pendingTitle}>Checkout started</Text>
+            <Text style={styles.pendingTitle}>Secure checkout</Text>
             <Text style={styles.pendingBody}>
-              Complete the Razorpay test payment in your browser, then come back here and verify it to unlock unlimited scans.
+              Continue with Razorpay inside the app. We create a secure order on the server and unlock premium only after payment verification succeeds.
             </Text>
-            <Pressable
-              style={({ pressed }) => [
-                styles.verifyButton,
-                (pressed || isVerifying) && { opacity: 0.88 },
-              ]}
-              onPress={() => void handleVerifyPayment()}
-              disabled={isVerifying}
-            >
-              <LinearGradient
-                colors={Gradients.primary}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.verifyButtonGradient}
-              >
-                {isVerifying ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <Text style={styles.verifyButtonText}>I Completed Payment</Text>
-                )}
-              </LinearGradient>
-            </Pressable>
+            {isVerifying ? (
+              <View style={styles.verifyingRow}>
+                <ActivityIndicator color={Palette.primary} />
+                <Text style={styles.verifyingText}>Verifying your payment...</Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
       </ScrollView>
@@ -207,13 +284,13 @@ export default function PaymentScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.payButton,
-            (pressed || isUnlocked || isPaying) && { opacity: 0.88 },
+            (pressed || isUnlocked || isPaying || isVerifying) && { opacity: 0.88 },
           ]}
           onPress={() => void handlePayment()}
-          disabled={isUnlocked || isPaying}
+          disabled={isUnlocked || isPaying || isVerifying}
         >
           <LinearGradient colors={Gradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.payButtonGradient}>
-            {isPaying ? (
+            {isPaying || isVerifying ? (
               <ActivityIndicator color="#FFF" />
             ) : (
               <Text style={styles.payButtonText}>{isUnlocked ? 'Already Unlocked' : `Pay ${ONE_TIME_PAYMENT_LABEL}`}</Text>
@@ -221,6 +298,39 @@ export default function PaymentScreen() {
           </LinearGradient>
         </Pressable>
       </View>
+
+      <Modal
+        visible={isFailureModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsFailureModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setIsFailureModalVisible(false)} />
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconWrap}>
+              <TriangleAlert size={24} color="#FFF" />
+            </View>
+            <Text style={styles.modalTitle}>{failureTitle}</Text>
+            <Text style={styles.modalBody}>{failureMessage}</Text>
+            <Text style={styles.modalHint}>{failureHint}</Text>
+
+            <Pressable
+              style={({ pressed }) => [styles.modalPrimaryButton, pressed && { opacity: 0.9 }]}
+              onPress={() => setIsFailureModalVisible(false)}
+            >
+              <LinearGradient
+                colors={['#C5164E', '#FF7A45']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.modalPrimaryGradient}
+              >
+                <Text style={styles.modalPrimaryText}>Try Again</Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -392,21 +502,16 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: Palette.onSurfaceVariant,
   },
-  verifyButton: {
+  verifyingRow: {
     marginTop: 16,
-    borderRadius: Radius.xxl,
-    overflow: 'hidden',
-  },
-  verifyButtonGradient: {
-    minHeight: 52,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 18,
+    gap: 10,
   },
-  verifyButtonText: {
-    fontFamily: 'PlusJakartaSans-Bold',
-    fontSize: 15,
-    color: '#FFF',
+  verifyingText: {
+    fontFamily: 'Manrope-SemiBold',
+    fontSize: 13,
+    color: Palette.onSurface,
   },
   footer: {
     position: 'absolute',
@@ -417,6 +522,73 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingTop: 12,
     backgroundColor: 'rgba(246,246,255,0.96)',
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: 'rgba(10, 12, 20, 0.45)',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: Radius.xxxl,
+    backgroundColor: Palette.surfaceContainerLowest,
+    padding: 24,
+    alignItems: 'center',
+    ...Shadows.ambient,
+  },
+  modalIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#C5164E',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontFamily: 'PlusJakartaSans-ExtraBold',
+    fontSize: 24,
+    color: Palette.onSurface,
+    textAlign: 'center',
+  },
+  modalBody: {
+    marginTop: 10,
+    fontFamily: 'Manrope-SemiBold',
+    fontSize: 15,
+    lineHeight: 24,
+    color: Palette.onSurface,
+    textAlign: 'center',
+  },
+  modalHint: {
+    marginTop: 8,
+    fontFamily: 'Manrope-Medium',
+    fontSize: 14,
+    lineHeight: 22,
+    color: Palette.onSurfaceVariant,
+    textAlign: 'center',
+  },
+  modalPrimaryButton: {
+    width: '100%',
+    marginTop: 20,
+    borderRadius: Radius.xxl,
+    overflow: 'hidden',
+  },
+  modalPrimaryGradient: {
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  modalPrimaryText: {
+    fontFamily: 'PlusJakartaSans-Bold',
+    fontSize: 15,
+    color: '#FFF',
   },
   payButton: {
     borderRadius: Radius.xxxl,

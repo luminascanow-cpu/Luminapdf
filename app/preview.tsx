@@ -1,15 +1,16 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, Alert, ActivityIndicator, Modal, Platform, KeyboardAvoidingView, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, ScrollView, Alert, ActivityIndicator, Modal, Platform, KeyboardAvoidingView, useWindowDimensions, PanResponder } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Palette, Gradients, Shadows, Radius } from '../constants/Theme';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Check, ImageIcon, Share2, FileDigit, Crop, Trash2, Sliders, Plus, X, Mail, MessageCircle, FileImage, FileText, Edit2 } from 'lucide-react-native';
+import { ArrowLeft, Check, ImageIcon, Share2, FileDigit, Crop, Trash2, Plus, X, Mail, MessageCircle, FileImage, FileText, Edit2, PenTool, RotateCcw } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TextInput } from 'react-native';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as ImageManipulator from 'expo-image-manipulator';
+import Svg, { Path } from 'react-native-svg';
 import { saveDocument, updateDocument } from '../lib/storage';
 import { usePermissions } from '../hooks/usePermissions';
 import * as MediaLibrary from 'expo-media-library';
@@ -18,7 +19,12 @@ import { FREE_PAGE_LIMIT, getUsageGateState } from '../lib/paymentGate';
 import { UpgradeRequiredModal } from '../components/UpgradeRequiredModal';
 
 type ExportFormat = 'PDF' | 'JPG' | 'PNG' | 'TXT';
-
+type SignaturePlacement = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 const mimeMap: Record<ExportFormat, string> = {
   PDF: 'application/pdf',
   JPG: 'image/jpeg',
@@ -74,9 +80,18 @@ export default function PreviewScreen() {
    const [showSuccessModal, setShowSuccessModal] = useState(false);
    const [exportedUri, setExportedUri] = useState<string | null>(null);
    const [draftId, setDraftId] = useState<number | null>(parsedRouteDraftId);
+   const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
+   const [isSignatureModalVisible, setIsSignatureModalVisible] = useState(false);
+   const [signaturePath, setSignaturePath] = useState('');
+   const [signatureDraftPath, setSignatureDraftPath] = useState('');
+   const [signaturePlacements, setSignaturePlacements] = useState<Record<number, SignaturePlacement>>({});
+   const [reviewFrameSize, setReviewFrameSize] = useState({ width: 0, height: 0 });
    const isTxtExtractionAvailable = Platform.OS === 'android';
    const [upgradeMessage, setUpgradeMessage] = useState('');
    const [isUpgradeModalVisible, setIsUpgradeModalVisible] = useState(false);
+   const signaturePathRef = useRef('');
+   const signatureDragOriginRef = useRef<SignaturePlacement | null>(null);
+   const signatureTouchOffsetRef = useRef({ x: 0, y: 0 });
 
    useEffect(() => {
      const nextName = initialName || fallbackDocumentName;
@@ -191,25 +206,60 @@ export default function PreviewScreen() {
     }
   };
 
+  const encodeImageForPdf = async (uri: string) => {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      if (base64) {
+        return base64;
+      }
+    } catch (readError) {
+      console.warn('Direct PDF image read failed, falling back to conversion.', readError);
+    }
+
+    const prepared = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1000 } }],
+      {
+        compress: 0.58,
+        format: ImageManipulator.SaveFormat.JPEG,
+        base64: true,
+      }
+    );
+
+    if (!prepared.base64) {
+      throw new Error('Failed to prepare one of the pages for PDF export.');
+    }
+
+    return prepared.base64;
+  };
+
   const generatePdfHtml = async (uris: string[]) => {
     const imagesHtml = await Promise.all(uris.map(async (uri, index) => {
-      const prepared = await ImageManipulator.manipulateAsync(
-        uri,
-        [{ resize: { width: 1200 } }],
-        {
-          compress: 0.7,
-          format: ImageManipulator.SaveFormat.JPEG,
-          base64: true,
-        }
-      );
-
-      if (!prepared.base64) {
-        throw new Error('Failed to prepare one of the pages for PDF export.');
-      }
+      const base64 = await encodeImageForPdf(uri);
+      const signatureMarkup = signaturePath && signaturePlacements[index]
+        ? `
+        <div
+          style="
+            position:absolute;
+            left:${(signaturePlacements[index].x * 100).toFixed(2)}%;
+            top:${(signaturePlacements[index].y * 100).toFixed(2)}%;
+            width:${(signaturePlacements[index].width * 100).toFixed(2)}%;
+            height:${(signaturePlacements[index].height * 100).toFixed(2)}%;
+          "
+        >
+          <svg viewBox="0 0 320 120" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+            <path d="${signaturePath.replace(/"/g, '&quot;')}" fill="none" stroke="#111827" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>`
+        : '';
 
       return `
         <div class="page" style="${index > 0 ? 'page-break-before: always;' : ''}">
-          <img src="data:image/jpeg;base64,${prepared.base64}" />
+          <img src="data:image/jpeg;base64,${base64}" />
+          ${signatureMarkup}
         </div>
       `;
     }));
@@ -218,19 +268,36 @@ export default function PreviewScreen() {
       <html>
         <head>
           <style>
-            html, body { margin: 0; padding: 0; background-color: white; }
+            html, body {
+              margin: 0;
+              padding: 0;
+              width: 100%;
+              background-color: white;
+            }
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
             .page {
-              width: 100%;
-              page-break-inside: avoid;
+              width: 100vw;
+              height: 100vh;
+              display: flex;
+              align-items: center;
+              justify-content: center;
               background: white;
+              position: relative;
+              overflow: hidden;
+              page-break-inside: avoid;
             }
             img {
-              width: 100%;
+              max-width: 100%;
+              max-height: 100%;
+              width: auto;
               height: auto;
+              object-fit: contain;
               display: block;
             }
-            @page { margin: 0; size: auto; }
+            @page {
+              size: A4 portrait;
+              margin: 0;
+            }
           </style>
         </head>
         <body>
@@ -259,6 +326,11 @@ export default function PreviewScreen() {
 
     if (format === 'TXT' && !isTxtExtractionAvailable) {
       Alert.alert('Unavailable', 'Text extraction is currently available on Android only.');
+      return;
+    }
+
+    if (signaturePath && format !== 'PDF') {
+      Alert.alert('PDF Required', 'Signed documents can currently be exported as PDF only.');
       return;
     }
 
@@ -450,65 +522,58 @@ export default function PreviewScreen() {
     });
   };
 
-  // ── B&W filter ─────────────────────────────────────────────────────────────
-  // expo-image-manipulator v14 supports only: resize, rotate, flip, crop.
-  // True grayscale is not available natively. We simulate a document-scan look
-  // by upscaling slightly (sharpens edges), then aggressively compressing as
-  // JPEG which auto-desaturates low-saturation images in many camera rolls.
+  const replaceActivePage = (nextUri: string) => {
+    const nextUris = [...localUris];
+    nextUris[activeIndex] = nextUri;
+    setLocalUris(nextUris);
+  };
+
+  const createDocumentCleanupPass = async (uri: string, width: number, compress: number) => {
+    return ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width } }],
+      {
+        compress,
+        format: ImageManipulator.SaveFormat.JPEG,
+      }
+    );
+  };
+
+  // ── B&W / document cleanup ────────────────────────────────────────────────
+  // Expo's built-in manipulator does not offer a true grayscale or threshold
+  // filter, so we lean into a stronger document-style cleanup pass instead:
+  // oversample, average back down, and strip color detail through multiple
+  // JPEG passes. The result is intentionally more obvious than the previous
+  // subtle effect and works well on text-heavy scans.
   const handleFilter = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
       const currentUri = localUris[activeIndex];
-
-      // Pass 1: upscale to extract fine detail
-      const pass1 = await ImageManipulator.manipulateAsync(
-        currentUri,
-        [{ resize: { width: 1800 } }],
-        { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
-      );
-      // Pass 2: downscale back — this averages pixels and mimics a high-contrast
-      // document scan (crisp text, white background)
-      const result = await ImageManipulator.manipulateAsync(
-        pass1.uri,
-        [{ resize: { width: 900 } }],
-        { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG }
-      );
-
-      const newUris = [...localUris];
-      newUris[activeIndex] = result.uri;
-      setLocalUris(newUris);
+      const pass1 = await createDocumentCleanupPass(currentUri, 2200, 0.7);
+      const pass2 = await createDocumentCleanupPass(pass1.uri, 1400, 0.38);
+      const result = await createDocumentCleanupPass(pass2.uri, 1100, 0.22);
+      replaceActivePage(result.uri);
     } catch (e) {
       console.error('Filter error:', e);
-      Alert.alert('B&W Failed', 'Could not apply filter to this image.');
+      Alert.alert('B&W Failed', 'Could not apply the document cleanup effect to this image.');
     } finally {
       setIsProcessing(false);
     }
   };
 
   // ── Smart Enhance ───────────────────────────────────────────────────────────
-  // Upscale → downscale pipeline creates a sharpening effect through
-  // oversampling, giving crisper text without any native color API.
+  // A stronger multi-pass oversampling pass helps text edges feel cleaner and
+  // more intentional than the original one-pass resize.
   const handleSmartEnhance = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
       const currentUri = localUris[activeIndex];
-
-      const pass1 = await ImageManipulator.manipulateAsync(
-        currentUri,
-        [{ resize: { width: 2000 } }],
-        { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
-      );
-      const result = await ImageManipulator.manipulateAsync(
-        pass1.uri,
-        [{ resize: { width: 1000 } }],
-        { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
-      );
-
-      const newUris = [...localUris];
-      newUris[activeIndex] = result.uri;
-      setLocalUris(newUris);
+      const pass1 = await createDocumentCleanupPass(currentUri, 2600, 0.92);
+      const pass2 = await createDocumentCleanupPass(pass1.uri, 1700, 0.82);
+      const result = await createDocumentCleanupPass(pass2.uri, 1200, 0.9);
+      replaceActivePage(result.uri);
     } catch (e) {
       console.error('Enhance error:', e);
       Alert.alert('Enhance Failed', 'Could not enhance this image.');
@@ -536,6 +601,160 @@ export default function PreviewScreen() {
       renameScrollRef.current?.scrollToEnd({ animated: true });
     }, 120);
   };
+
+  const setPlacementForPage = useCallback((pageIndex: number, nextPlacement: SignaturePlacement) => {
+    setSignaturePlacements((current) => ({
+      ...current,
+      [pageIndex]: nextPlacement,
+    }));
+  }, []);
+
+  const getDefaultSignaturePlacement = useCallback((): SignaturePlacement => ({
+    x: 0.36,
+    y: 0.76,
+    width: 0.28,
+    height: 0.12,
+  }), []);
+
+  const applySignatureToActivePage = useCallback(() => {
+    if (!signaturePath) return;
+
+    setPlacementForPage(activeIndex, signaturePlacements[activeIndex] || getDefaultSignaturePlacement());
+    setIsReviewModalVisible(true);
+  }, [activeIndex, getDefaultSignaturePlacement, setPlacementForPage, signaturePath, signaturePlacements]);
+
+  const recenterActiveSignature = useCallback(() => {
+    if (!signaturePath) return;
+    setPlacementForPage(activeIndex, getDefaultSignaturePlacement());
+  }, [activeIndex, getDefaultSignaturePlacement, setPlacementForPage, signaturePath]);
+
+  const removeSignatureFromActivePage = useCallback(() => {
+    setSignaturePlacements((current) => {
+      const next = { ...current };
+      delete next[activeIndex];
+      return next;
+    });
+  }, [activeIndex]);
+
+  const resizeActiveSignature = useCallback((delta: number) => {
+    const currentPlacement = signaturePlacements[activeIndex];
+    if (!currentPlacement) return;
+
+    const nextWidth = Math.min(Math.max(0.18, currentPlacement.width + delta), 0.55);
+    const aspectRatio = currentPlacement.height / currentPlacement.width;
+    const nextHeight = Math.min(Math.max(0.08, nextWidth * aspectRatio), 0.24);
+    const nextX = Math.min(currentPlacement.x, 1 - nextWidth - 0.04);
+    const nextY = Math.min(currentPlacement.y, 1 - nextHeight - 0.05);
+
+    setPlacementForPage(activeIndex, {
+      ...currentPlacement,
+      x: Math.max(0.04, nextX),
+      y: Math.max(0.05, nextY),
+      width: nextWidth,
+      height: nextHeight,
+    });
+  }, [activeIndex, setPlacementForPage, signaturePlacements]);
+
+  const clearSignatureDraft = () => {
+    signaturePathRef.current = '';
+    setSignatureDraftPath('');
+  };
+
+  const saveSignature = () => {
+    if (!signatureDraftPath.trim()) {
+      Alert.alert('Signature Needed', 'Please draw your signature before saving it.');
+      return;
+    }
+
+    setSignaturePath(signatureDraftPath);
+    setIsSignatureModalVisible(false);
+    setPlacementForPage(activeIndex, signaturePlacements[activeIndex] || getDefaultSignaturePlacement());
+    setIsReviewModalVisible(true);
+  };
+
+  const handleSignaturePress = () => {
+    if (signaturePath) {
+      applySignatureToActivePage();
+      return;
+    }
+
+    clearSignatureDraft();
+    setIsSignatureModalVisible(true);
+  };
+
+  const handleOpenReview = () => {
+    if (localUris.length === 0) return;
+    setIsReviewModalVisible(true);
+  };
+
+  const signaturePadResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (event) => {
+      const { locationX, locationY } = event.nativeEvent;
+      const start = `${signaturePathRef.current ? ' ' : ''}M ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
+      signaturePathRef.current += start;
+      setSignatureDraftPath(signaturePathRef.current);
+    },
+    onPanResponderMove: (event) => {
+      const { locationX, locationY } = event.nativeEvent;
+      signaturePathRef.current += ` L ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
+      setSignatureDraftPath(signaturePathRef.current);
+    },
+  }), []);
+
+  const reviewSignatureResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => Boolean(signaturePlacements[activeIndex]),
+    onMoveShouldSetPanResponder: () => Boolean(signaturePlacements[activeIndex]),
+    onStartShouldSetPanResponderCapture: () => Boolean(signaturePlacements[activeIndex]),
+    onMoveShouldSetPanResponderCapture: () => Boolean(signaturePlacements[activeIndex]),
+    onPanResponderGrant: (event) => {
+      const currentPlacement = signaturePlacements[activeIndex] || null;
+      signatureDragOriginRef.current = currentPlacement;
+      if (!currentPlacement) return;
+
+      const reviewWidth = Math.max(reviewFrameSize.width, 1);
+      const reviewHeight = Math.max(reviewFrameSize.height, 1);
+      const touchX = event.nativeEvent.locationX / reviewWidth;
+      const touchY = event.nativeEvent.locationY / reviewHeight;
+
+      signatureTouchOffsetRef.current = {
+        x: touchX - currentPlacement.x,
+        y: touchY - currentPlacement.y,
+      };
+    },
+    onPanResponderMove: (event) => {
+      const currentPlacement = signatureDragOriginRef.current || signaturePlacements[activeIndex];
+      if (!currentPlacement) return;
+
+      const reviewWidth = Math.max(reviewFrameSize.width, 1);
+      const reviewHeight = Math.max(reviewFrameSize.height, 1);
+      const touchX = event.nativeEvent.locationX / reviewWidth;
+      const touchY = event.nativeEvent.locationY / reviewHeight;
+      const nextX = Math.min(
+        Math.max(0, touchX - signatureTouchOffsetRef.current.x),
+        1 - currentPlacement.width
+      );
+      const nextY = Math.min(
+        Math.max(0, touchY - signatureTouchOffsetRef.current.y),
+        1 - currentPlacement.height
+      );
+
+      setPlacementForPage(activeIndex, {
+        ...currentPlacement,
+        x: nextX,
+        y: nextY,
+      });
+    },
+    onPanResponderRelease: () => {
+      signatureDragOriginRef.current = null;
+      signatureTouchOffsetRef.current = { x: 0, y: 0 };
+    },
+    onPanResponderTerminate: () => {
+      signatureDragOriginRef.current = null;
+      signatureTouchOffsetRef.current = { x: 0, y: 0 };
+    },
+  }), [activeIndex, reviewFrameSize.height, reviewFrameSize.width, setPlacementForPage, signaturePlacements]);
 
   return (
     <View style={styles.container}>
@@ -583,7 +802,7 @@ export default function PreviewScreen() {
           >
             {localUris.map((uri, index) => (
               <View key={index} style={[styles.previewCard, { width: width - 24 }]}>
-                <View style={styles.previewImageFrame}>
+                <Pressable style={styles.previewImageFrame} onPress={handleOpenReview}>
                   {isProcessing && activeIndex === index ? (
                     <View style={[styles.previewImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }]}>
                       <ActivityIndicator color={Palette.primary} />
@@ -594,7 +813,28 @@ export default function PreviewScreen() {
                   <View style={styles.pageBadge}>
                     <Text style={styles.pageBadgeText}>{index + 1} / {localUris.length}</Text>
                   </View>
-                </View>
+                  {signaturePath && signaturePlacements[index] ? (
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        styles.signatureOverlay,
+                        {
+                          left: `${signaturePlacements[index].x * 100}%`,
+                          top: `${signaturePlacements[index].y * 100}%`,
+                          width: `${signaturePlacements[index].width * 100}%`,
+                          height: `${signaturePlacements[index].height * 100}%`,
+                        },
+                      ]}
+                    >
+                      <Svg width="100%" height="100%" viewBox="0 0 320 120">
+                        <Path d={signaturePath} fill="none" stroke="#111827" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
+                      </Svg>
+                    </View>
+                  ) : null}
+                  <View style={styles.tapHint}>
+                    <Text style={styles.tapHintText}>Tap to review full page</Text>
+                  </View>
+                </Pressable>
               </View>
             ))}
           </ScrollView>
@@ -623,11 +863,11 @@ export default function PreviewScreen() {
                 </View>
                 <Text style={styles.toolLabel}>Enhance</Text>
             </Pressable>
-            <Pressable onPress={handleFilter} style={styles.toolItem}>
+            <Pressable onPress={handleSignaturePress} style={styles.toolItem}>
                 <View style={styles.toolIcon}>
-                    <Sliders size={20} color="#FFF" />
+                    <PenTool size={20} color="#FFF" />
                 </View>
-                <Text style={styles.toolLabel}>B&W</Text>
+                <Text style={styles.toolLabel}>Sign</Text>
             </Pressable>
             <Pressable onPress={handleDeletePage} style={styles.toolItem}>
                 <View style={[styles.toolIcon, { backgroundColor: 'rgba(255,50,50,0.1)' }]}>
@@ -703,6 +943,172 @@ export default function PreviewScreen() {
       </View>
 
       <SafeAreaView edges={['bottom']} style={styles.bottomSpace} />
+
+      <Modal visible={isReviewModalVisible} transparent animationType="slide">
+        <View style={styles.reviewOverlay}>
+          <SafeAreaView style={styles.reviewSafeArea}>
+            <View style={styles.reviewHeader}>
+              <Pressable onPress={() => setIsReviewModalVisible(false)} style={styles.reviewCloseBtn}>
+                <Text style={styles.reviewCloseText}>Close</Text>
+              </Pressable>
+              <Text style={styles.reviewTitle}>Review Page</Text>
+              <View style={styles.reviewHeaderSpacer} />
+            </View>
+
+            <Text style={styles.reviewSubtitle}>
+              Check the page closely and confirm if any changes are needed before export.
+            </Text>
+
+            <ScrollView
+              horizontal
+              pagingEnabled
+              scrollEnabled={!signaturePlacements[activeIndex]}
+              showsHorizontalScrollIndicator={false}
+              onScroll={(e) => {
+                const x = e.nativeEvent.contentOffset.x;
+                setActiveIndex(Math.round(x / Math.max(width, 1)));
+              }}
+              scrollEventThrottle={16}
+              contentOffset={{ x: activeIndex * width, y: 0 }}
+            >
+              {localUris.map((uri, index) => (
+                <View key={`review-${index}`} style={[styles.reviewPage, { width }]}>
+                  <View
+                    style={styles.reviewImageFrame}
+                    onLayout={(event) => {
+                      if (index !== activeIndex) return;
+                      const { width: frameWidth, height: frameHeight } = event.nativeEvent.layout;
+                      setReviewFrameSize((current) => (
+                        current.width === frameWidth && current.height === frameHeight
+                          ? current
+                          : { width: frameWidth, height: frameHeight }
+                      ));
+                    }}
+                    {...(index === activeIndex && signaturePlacements[index] ? reviewSignatureResponder.panHandlers : {})}
+                  >
+                    <Image source={{ uri }} style={styles.reviewImage} />
+                    {signaturePath && signaturePlacements[index] ? (
+                      <View
+                        style={[
+                          styles.reviewSignatureOverlay,
+                          {
+                            left: `${signaturePlacements[index].x * 100}%`,
+                            top: `${signaturePlacements[index].y * 100}%`,
+                            width: `${signaturePlacements[index].width * 100}%`,
+                            height: `${signaturePlacements[index].height * 100}%`,
+                          },
+                        ]}
+                        pointerEvents="none"
+                      >
+                        <Svg width="100%" height="100%" viewBox="0 0 320 120">
+                          <Path d={signaturePath} fill="none" stroke="#111827" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
+                        </Svg>
+                      </View>
+                    ) : null}
+                  </View>
+                  <View style={styles.reviewBadge}>
+                    <Text style={styles.reviewBadgeText}>{index + 1} / {localUris.length}</Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.reviewActions}>
+              {signaturePath ? (
+                <>
+                  <View style={styles.reviewUtilityRow}>
+                    <Pressable style={styles.reviewMiniBtn} onPress={signaturePlacements[activeIndex] ? recenterActiveSignature : applySignatureToActivePage}>
+                      <Text style={styles.reviewMiniBtnText}>{signaturePlacements[activeIndex] ? 'Recenter Signature' : 'Sign This Page'}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.reviewMiniBtn, !signaturePlacements[activeIndex] && styles.reviewMiniBtnDisabled]}
+                      onPress={() => resizeActiveSignature(-0.04)}
+                      disabled={!signaturePlacements[activeIndex]}
+                    >
+                      <Text style={styles.reviewMiniBtnText}>Smaller</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.reviewMiniBtn, !signaturePlacements[activeIndex] && styles.reviewMiniBtnDisabled]}
+                      onPress={() => resizeActiveSignature(0.04)}
+                      disabled={!signaturePlacements[activeIndex]}
+                    >
+                      <Text style={styles.reviewMiniBtnText}>Larger</Text>
+                    </Pressable>
+                    <Pressable style={styles.reviewMiniBtn} onPress={() => {
+                      setIsReviewModalVisible(false);
+                      setIsSignatureModalVisible(true);
+                    }}>
+                      <Text style={styles.reviewMiniBtnText}>Redraw</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.reviewMiniBtn, !signaturePlacements[activeIndex] && styles.reviewMiniBtnDisabled]}
+                      onPress={removeSignatureFromActivePage}
+                      disabled={!signaturePlacements[activeIndex]}
+                    >
+                      <Text style={styles.reviewMiniBtnText}>Remove</Text>
+                    </Pressable>
+                  </View>
+                  {signaturePlacements[activeIndex] ? (
+                    <Text style={styles.reviewHint}>Drag the signature to move it, or use Smaller and Larger to resize it.</Text>
+                  ) : null}
+                </>
+              ) : null}
+              <Pressable
+                style={styles.reviewConfirmBtn}
+                onPress={() => {
+                  setIsReviewModalVisible(false);
+                }}
+              >
+                <Text style={styles.reviewConfirmText}>Looks Good</Text>
+              </Pressable>
+            </View>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
+      <Modal visible={isSignatureModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.signatureSheet}>
+            <View style={styles.signatureHeader}>
+              <View>
+                <Text style={styles.signatureTitle}>Create Signature</Text>
+                <Text style={styles.signatureSubtitle}>Draw your signature, then place it on the page.</Text>
+              </View>
+              <Pressable onPress={() => setIsSignatureModalVisible(false)}>
+                <X size={22} color={Palette.onSurfaceVariant} />
+              </Pressable>
+            </View>
+
+            <View style={styles.signatureCanvas} {...signaturePadResponder.panHandlers}>
+              {signatureDraftPath ? (
+                <Svg width="100%" height="100%" viewBox="0 0 320 120">
+                  <Path d={signatureDraftPath} fill="none" stroke="#111827" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              ) : (
+                <View style={styles.signatureEmptyState}>
+                  <PenTool size={28} color={Palette.primary} />
+                  <Text style={styles.signatureEmptyTitle}>Draw your signature</Text>
+                  <Text style={styles.signatureEmptyText}>Use your finger inside this box.</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.signatureFooter}>
+              <Pressable style={styles.signatureGhostBtn} onPress={clearSignatureDraft}>
+                <RotateCcw size={16} color={Palette.primary} />
+                <Text style={styles.signatureGhostText}>Clear</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.signatureSaveBtn, !signatureDraftPath && styles.reviewMiniBtnDisabled]}
+                onPress={saveSignature}
+                disabled={!signatureDraftPath}
+              >
+                <Text style={styles.signatureSaveText}>Save Signature</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Export Overlay */}
       <Modal visible={isExporting} transparent animationType="fade">
@@ -928,6 +1334,26 @@ const styles = StyleSheet.create({
       fontSize: 10,
       color: Palette.onSurface,
   },
+  signatureOverlay: {
+      position: 'absolute',
+      zIndex: 2,
+  },
+  tapHint: {
+      position: 'absolute',
+      left: 12,
+      bottom: 12,
+      backgroundColor: 'rgba(12,16,32,0.75)',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 999,
+  },
+  tapHintText: {
+      fontFamily: 'Manrope-Bold',
+      fontSize: 10,
+      color: '#FFFFFF',
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+  },
   dots: {
       flexDirection: 'row',
       gap: 6,
@@ -977,6 +1403,138 @@ const styles = StyleSheet.create({
       paddingHorizontal: 24,
       marginBottom: 20,
   },
+  reviewOverlay: {
+      flex: 1,
+      backgroundColor: '#050814',
+  },
+  reviewSafeArea: {
+      flex: 1,
+  },
+  reviewHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 12,
+  },
+  reviewCloseBtn: {
+      minWidth: 64,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 14,
+  },
+  reviewCloseText: {
+      fontFamily: 'PlusJakartaSans-Bold',
+      fontSize: 14,
+      color: '#FFFFFF',
+  },
+  reviewTitle: {
+      fontFamily: 'PlusJakartaSans-ExtraBold',
+      fontSize: 18,
+      color: '#FFFFFF',
+  },
+  reviewHeaderSpacer: {
+      width: 64,
+  },
+  reviewSubtitle: {
+      paddingHorizontal: 24,
+      marginBottom: 12,
+      textAlign: 'center',
+      fontFamily: 'Manrope-SemiBold',
+      fontSize: 13,
+      lineHeight: 20,
+      color: 'rgba(255,255,255,0.7)',
+  },
+  reviewPage: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+  },
+  reviewImageFrame: {
+      width: '100%',
+      height: '100%',
+      position: 'relative',
+      overflow: 'hidden',
+  },
+  reviewImage: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'contain',
+  },
+  reviewSignatureOverlay: {
+      position: 'absolute',
+      zIndex: 3,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: 'rgba(70,71,211,0.7)',
+      backgroundColor: 'rgba(255,255,255,0.35)',
+      borderRadius: 10,
+  },
+  reviewBadge: {
+      position: 'absolute',
+      top: 18,
+      right: 32,
+      backgroundColor: 'rgba(255,255,255,0.14)',
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 999,
+  },
+  reviewBadgeText: {
+      fontFamily: 'PlusJakartaSans-Bold',
+      fontSize: 11,
+      color: '#FFFFFF',
+  },
+  reviewActions: {
+      paddingHorizontal: 24,
+      paddingTop: 12,
+      paddingBottom: 24,
+  },
+  reviewUtilityRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginBottom: 12,
+  },
+  reviewMiniBtn: {
+      minHeight: 40,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  reviewMiniBtnDisabled: {
+      opacity: 0.45,
+  },
+  reviewMiniBtnText: {
+      fontFamily: 'PlusJakartaSans-Bold',
+      fontSize: 12,
+      color: '#FFFFFF',
+  },
+  reviewHint: {
+      fontFamily: 'Manrope-Medium',
+      fontSize: 12,
+      color: 'rgba(255,255,255,0.7)',
+      marginBottom: 12,
+  },
+  reviewConfirmBtn: {
+      minHeight: 54,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: Palette.primary,
+  },
+  reviewConfirmText: {
+      fontFamily: 'PlusJakartaSans-ExtraBold',
+      fontSize: 15,
+      color: '#FFFFFF',
+  },
   formatTitle: {
       fontFamily: 'PlusJakartaSans-Bold',
       fontSize: 14,
@@ -1023,6 +1581,94 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  signatureSheet: {
+    width: '92%',
+    maxWidth: 460,
+    backgroundColor: Palette.surfaceContainerLowest,
+    borderRadius: Radius.xxxl,
+    padding: 22,
+    ...Shadows.ambient,
+  },
+  signatureHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 18,
+  },
+  signatureTitle: {
+    fontFamily: 'PlusJakartaSans-ExtraBold',
+    fontSize: 20,
+    color: Palette.onSurface,
+  },
+  signatureSubtitle: {
+    marginTop: 6,
+    fontFamily: 'Manrope-Medium',
+    fontSize: 13,
+    lineHeight: 20,
+    color: Palette.onSurfaceVariant,
+  },
+  signatureCanvas: {
+    height: 180,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: Palette.outlineVariant + '55',
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  signatureEmptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  signatureEmptyTitle: {
+    marginTop: 12,
+    fontFamily: 'PlusJakartaSans-Bold',
+    fontSize: 16,
+    color: Palette.onSurface,
+  },
+  signatureEmptyText: {
+    marginTop: 6,
+    fontFamily: 'Manrope-Medium',
+    fontSize: 13,
+    textAlign: 'center',
+    color: Palette.onSurfaceVariant,
+  },
+  signatureFooter: {
+    marginTop: 18,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  signatureGhostBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: Palette.surfaceContainerLow,
+  },
+  signatureGhostText: {
+    fontFamily: 'PlusJakartaSans-Bold',
+    fontSize: 13,
+    color: Palette.primary,
+  },
+  signatureSaveBtn: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Palette.primary,
+  },
+  signatureSaveText: {
+    fontFamily: 'PlusJakartaSans-ExtraBold',
+    fontSize: 14,
+    color: '#FFFFFF',
   },
   shareSheet: {
     backgroundColor: Palette.surfaceContainerLowest,
