@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign In | Lumina Scan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="auth-body" data-auth-mode="sign-in">
+    <header class="site-header">
+      <div class="shell">
+        <nav class="nav">
+          <a class="brand" href="./index.html">
+            <img class="brand-mark" src="./app-logo.png" alt="Lumina Scan logo" />
+            <div class="brand-copy">
+              <strong>Lumina Scan</strong>
+              <span>Website sign in</span>
+            </div>
+          </a>
+          <div class="nav-links">
+            <a href="./index.html">Home</a>
+            <a href="./pdf-editor.html">PDF Editor</a>
+            <a href="./privacy.html">Privacy</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main class="shell auth-page">
+      <section class="auth-grid">
+        <article class="auth-hero-card">
+          <div class="eyebrow">Same Backend As Mobile</div>
+          <h1>Sign in to the website with the same Lumina Scan account.</h1>
+          <p>
+            This website sign-in flow uses the same account system as the mobile app, so users can
+            sign in with the same account, access the same profile record, and stay aligned with
+            the mobile experience.
+          </p>
+          <div class="policy-points">
+            <span class="policy-chip">Shared account access</span>
+            <span class="policy-chip">Same profile table</span>
+            <span class="policy-chip">Website + mobile parity</span>
+          </div>
+          <div class="auth-account-card" id="auth-account-card" hidden>
+            <span class="uploaded-file-label">Signed in as</span>
+            <strong id="auth-account-email">No account</strong>
+            <p id="auth-account-name">Profile not loaded yet.</p>
+            <div class="editor-inline-actions">
+              <a class="button button-secondary" href="./pdf-editor.html">Open PDF Editor</a>
+              <button class="button button-primary" id="auth-sign-out" type="button">Sign Out</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="auth-form-card">
+          <div class="auth-segmented">
+            <div class="auth-segment active" id="mode-sign-in" style="width: 100%; text-align: center; border-radius: var(--radius-lg); cursor: default;">Sign In</div>
+          </div>
+
+          <form id="auth-form" class="auth-form" onsubmit="event.preventDefault(); return false;">
+            <div class="auth-field" id="full-name-field" hidden>
+              <label class="editor-label" for="auth-full-name">Full Name</label>
+              <input id="auth-full-name" name="full_name" class="editor-input" type="text" placeholder="Enter your full name" />
+            </div>
+
+            <div class="auth-field">
+              <label class="editor-label" for="auth-email">Email</label>
+              <input id="auth-email" name="email" class="editor-input" type="email" placeholder="Enter your email" required />
+            </div>
+
+            <div class="auth-field">
+              <label class="editor-label" for="auth-password">Password</label>
+              <input id="auth-password" name="password" class="editor-input" type="password" placeholder="Enter your password" required />
+            </div>
+
+            <div class="auth-field" id="new-password-field" hidden>
+              <label class="editor-label" for="auth-new-password">New Password</label>
+              <input id="auth-new-password" name="new_password" class="editor-input" type="password" placeholder="Enter new password" />
+            </div>
+
+            <button class="button button-primary auth-submit" id="auth-submit" type="submit">Sign In</button>
+          </form>
+
+          <div class="auth-inline-actions">
+            <a class="button button-ghost" id="auth-forgot-password" href="./forgot-password.html">Forgot Password?</a>
+          </div>
+
+          <div class="auth-message" id="auth-message" hidden></div>
+          <div class="auth-config-warning" id="auth-config-warning" hidden>
+            Website auth is waiting for `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+            in the local server environment.
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./app-config.js"></script>
+    <script src="./supabase.js"></script>
+    <script src="./auth.js"></script>
+  </body>
+  </html>

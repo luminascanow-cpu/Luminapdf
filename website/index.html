@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lumina Scan | Sign In</title>
+    <meta
+      name="description"
+      content="Lumina Scan - Sign in to access your document tools."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script>
+      const authLandingParams = new URLSearchParams(window.location.search);
+      const authLandingHash = window.location.hash.startsWith('#')
+        ? new URLSearchParams(window.location.hash.slice(1))
+        : new URLSearchParams(window.location.hash);
+      const authLandingType = authLandingParams.get('type') || authLandingHash.get('type');
+      const authLandingToken =
+        authLandingParams.get('token_hash') ||
+        authLandingHash.get('token_hash') ||
+        authLandingParams.get('access_token') ||
+        authLandingHash.get('access_token');
+
+      if (authLandingType === 'recovery' && authLandingToken) {
+        window.location.replace(`./reset-password.html${window.location.search}${window.location.hash}`);
+      } else {
+        // Immediate redirect for "Signin only" homepage requirement
+        (async () => {
+          try {
+            const res = await fetch('./api/auth-session');
+            const data = await res.json();
+            if (data.authenticated) {
+              window.location.replace('./pdf-editor.html');
+            } else {
+              window.location.replace('./login.html');
+            }
+          } catch (e) {
+            window.location.replace('./login.html');
+          }
+        })();
+      }
+    </script>
+  </head>
+  <body class="auth-body">
+    <header class="site-header">
+      <div class="shell">
+        <nav class="nav">
+          <a class="brand" href="./index.html">
+            <img class="brand-mark" src="./app-logo.png" alt="Lumina Scan logo" />
+            <div class="brand-copy">
+              <strong>Lumina Scan</strong>
+              <span>Scan. Edit. Sign. Export.</span>
+            </div>
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="shell auth-page">
+      <section class="hero" style="min-height: 60vh; display: flex; align-items: center; justify-content: center; text-align: center;">
+        <div style="max-width: 600px;">
+          <div class="eyebrow" style="margin-bottom: 24px;">Welcome to Lumina Scan</div>
+          <h1 style="margin-bottom: 24px;">Capture and edit documents with ease.</h1>
+          <p style="font-size: 1.1rem; color: var(--text-soft); margin-bottom: 40px;">
+            Sign in to your account to start managing your scans, editing PDFs, and unlocking premium features.
+          </p>
+          <div class="hero-actions" style="justify-content: center;">
+            <a class="button button-primary" href="./login.html" style="padding: 16px 48px; font-size: 1.1rem;">Sign In to Continue</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-grid">
+        <div>
+          <strong>Lumina Scan</strong>
+          <p class="small-note">© <span data-year></span> Lumina Scan. All rights reserved.</p>
+        </div>
+        <div class="footer-links">
+          <a href="./privacy.html">Privacy Policy</a>
+          <a href="./terms.html">Terms &amp; Conditions</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="./script.js"></script>
+  </body>
+</html>

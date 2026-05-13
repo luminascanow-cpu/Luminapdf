@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Editor | Lumina Scan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="editor-body editor-standalone">
+    <header class="site-header editor-header">
+      <div class="shell">
+        <nav class="nav editor-nav">
+          <a class="brand" href="./index.html">
+            <img class="brand-mark" src="./app-logo.png" alt="Lumina Scan logo" />
+            <div class="brand-copy">
+              <strong>Lumina Scan</strong>
+              <span>Browser PDF editor</span>
+            </div>
+          </a>
+          <div class="editor-nav-copy">
+            <strong>PDF Editor</strong>
+            <span>Upload, replace, sign, reorder, and export</span>
+          </div>
+          <div class="editor-nav-actions">
+            <a class="button button-secondary" href="./index.html">Back Home</a>
+            <a class="button button-secondary" href="./login.html">Sign In</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main class="editor-page shell">
+      <section class="editor-shell">
+        <aside class="editor-left-rail">
+          <div class="editor-rail-card">
+            <div class="rail-header" id="left-rail-header">
+              <div class="rail-drag-handle">⋮⋮</div>
+              <div class="eyebrow">Editing Tools</div>
+              <h2>Left Toolbar</h2>
+            </div>
+
+            <div class="vertical-toolbar">
+              <div class="toolbar-group">
+                <label class="tool-btn tool-btn-primary file-trigger" title="Upload PDF">
+                  <input id="editor-pdf-upload" type="file" accept=".pdf,application/pdf" class="file-trigger-input" />
+                  <span class="tool-icon">↑</span> Upload
+                </label>
+
+                <label class="tool-btn" id="merge-pdf-label" for="editor-pdf-merge" title="Merge PDF">
+                  <input id="editor-pdf-merge" type="file" accept=".pdf,application/pdf" multiple hidden disabled />
+                  <span class="tool-icon">⨁</span> Merge
+                </label>
+
+                <button class="tool-btn" id="split-pdf-btn" type="button" disabled title="Split PDF into Pages">
+                  <span class="tool-icon">✂</span> Split
+                </button>
+                
+                <div class="tool-divider"></div>
+                
+                <div class="tool-instruction-card">
+                  <div class="tool-instruction-header">
+                    <span class="tool-icon">✎</span>
+                    <strong>Replace selection</strong>
+                  </div>
+                  <p>Drag over the PDF text you want to replace. Release the mouse and the new text box will open with the detected text and style.</p>
+                  <div class="tool-recommendation" id="text-style-recommendation">
+                    <strong>Matched style</strong>
+                    <span id="text-style-copy">Style will adapt to the selected text area.</span>
+                  </div>
+                  <div class="tool-chip-row" id="text-style-chips">
+                    <button class="tool-chip is-active" id="font-chip-sans" type="button" data-font-preset="sans">Sans</button>
+                    <button class="tool-chip" id="font-chip-serif" type="button" data-font-preset="serif">Serif</button>
+                    <button class="tool-chip" id="font-chip-mono" type="button" data-font-preset="mono">Mono</button>
+                  </div>
+                  <div class="editor-inline-fields compact-style-fields">
+                    <input id="editor-text-size" class="editor-input" type="number" min="8" max="72" value="18" step="0.1" title="Size" />
+                    <input id="editor-text-color" class="editor-color" type="color" value="#1f2340" title="Color" />
+                  </div>
+                </div>
+
+                <div class="tool-dropdown-container">
+                  <button class="tool-btn" id="tool-whiteout-dropdown" type="button">
+                    <span class="tool-icon">■</span> Whiteout
+                  </button>
+                  <div class="tool-dropdown" id="dropdown-whiteout" hidden>
+                    <div class="dropdown-header">Cover Content</div>
+                    <div class="editor-inline-fields">
+                      <div>
+                        <label class="editor-label" for="whiteout-width">W %</label>
+                        <input id="whiteout-width" class="editor-input" type="number" min="5" max="90" value="26" />
+                      </div>
+                      <div>
+                        <label class="editor-label" for="whiteout-height">H %</label>
+                        <input id="whiteout-height" class="editor-input" type="number" min="3" max="60" value="10" />
+                      </div>
+                    </div>
+                    <button class="button button-secondary editor-action" id="place-whiteout-button" type="button">Place Whiteout</button>
+                  </div>
+                </div>
+
+                <div class="tool-dropdown-container">
+                  <button class="tool-btn" id="tool-image-dropdown" type="button">
+                    <span class="tool-icon">🖼</span> Image
+                  </button>
+                  <div class="tool-dropdown" id="dropdown-image" hidden>
+                    <div class="dropdown-header">Add Image</div>
+                    <div class="image-import-preview" id="image-import-preview-box">
+                      <div class="preview-placeholder">No image selected</div>
+                      <img id="image-preview-el" hidden />
+                    </div>
+                    <label class="upload-zone compact-upload" for="editor-image-upload">
+                      <input id="editor-image-upload" type="file" accept="image/*" hidden />
+                      <span class="upload-icon">＋</span>
+                      <strong>Choose Image</strong>
+                      <small>JPG, PNG, WebP</small>
+                    </label>
+                    <div class="uploaded-file" id="editor-image-state" hidden>
+                      <strong id="editor-image-name">No image</strong>
+                    </div>
+                    <button class="button button-primary editor-action" id="place-image-button" style="width: 100%; margin-top: 12px;" type="button" disabled>Place Image</button>
+                  </div>
+                </div>
+
+                <div class="tool-dropdown-container">
+                  <button class="tool-btn" id="tool-signature-dropdown" type="button">
+                    <span class="tool-icon">✍</span> Sign
+                  </button>
+                  <div class="tool-dropdown" id="dropdown-signature" hidden>
+                    <div class="dropdown-header">Signature</div>
+                    <div class="signature-options-grid">
+                      <button class="sig-opt-btn" id="open-signature-modal" type="button">
+                        <span class="opt-icon">✎</span>
+                        <span>Draw</span>
+                      </button>
+                      <label class="sig-opt-btn" for="signature-upload-input">
+                        <input id="signature-upload-input" type="file" accept="image/*" hidden />
+                        <span class="opt-icon">↑</span>
+                        <span>Upload</span>
+                      </label>
+                    </div>
+                    <div id="active-signature-preview" class="active-sig-preview" hidden>
+                       <img id="sig-preview-img" alt="Signature preview" />
+                    </div>
+                    <button class="button button-primary editor-action" id="place-signature-button" style="width: 100%; margin-top: 12px;" type="button" disabled>Place Signature</button>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="toolbar-group toolbar-group-utility">
+                <div class="tool-divider"></div>
+                <button class="tool-btn icon-only" id="prev-page" type="button" disabled title="Previous Page">◀</button>
+                <button class="tool-btn icon-only" id="next-page" type="button" disabled title="Next Page">▶</button>
+                <div class="tool-divider"></div>
+                <button class="tool-btn icon-only" id="zoom-out" type="button" disabled title="Zoom Out">➖</button>
+                <button class="tool-btn icon-only" id="zoom-fit" type="button" disabled title="Fit to Page">⛶</button>
+                <button class="tool-btn icon-only" id="zoom-in" type="button" disabled title="Zoom In">➕</button>
+                <button class="tool-btn icon-only" id="tool-pan" type="button" disabled title="Pan Document">✋</button>
+                <div class="tool-divider"></div>
+                <button class="tool-btn icon-only" id="move-page-up" type="button" disabled title="Move Up">↑</button>
+                <button class="tool-btn icon-only" id="move-page-down" type="button" disabled title="Move Down">↓</button>
+                <button class="tool-btn icon-only" id="delete-page" type="button" disabled title="Delete Page">🗑</button>
+                <button class="tool-btn icon-only" id="extract-page" type="button" disabled title="Download Page">📄</button>
+                <button class="tool-btn icon-only" id="extract-text" type="button" disabled title="Extract Text (OCR)">🔍</button>
+                <button class="tool-btn icon-only" id="toggle-edit-mode" type="button" disabled title="Toggle Edit Mode (Full Screen)">🔲</button>
+                <div class="tool-divider"></div>
+                <button class="button button-primary tool-export-btn" id="download-edited-pdf" type="button" disabled>Export PDF</button>
+              </div>
+            </div>
+            
+            <div id="editor-file-state" hidden>
+              <span id="editor-file-name" hidden></span>
+            </div>
+          </div>
+
+        </aside>
+
+        <section class="editor-workspace">
+          <div class="editor-main-grid">
+            <div class="editor-status-bar">
+              <div>
+                <strong id="editor-status-title">No PDF loaded yet</strong>
+                <span id="editor-status-copy">Upload a PDF to begin editing.</span>
+              </div>
+              <div class="editor-mode-pill" id="editor-mode-pill">Mode: View</div>
+            </div>
+            <div class="page-stage-wrap">
+              <div class="page-stage-card" id="page-stage-card">
+                <div class="editor-empty-state" id="editor-empty-state">
+                  <div class="editor-empty-orb"></div>
+                  <div class="editor-empty-panel">
+                    <div class="editor-empty-badge">Lumina Scan Studio</div>
+                    <h2>Drag and drop your document here</h2>
+                    <p>Open a PDF directly into the editor, then review pages, drag over text to replace it, sign, and export a polished final file.</p>
+                    <div class="editor-empty-actions">
+                      <label class="button button-primary editor-empty-upload file-trigger">
+                        <input type="file" accept=".pdf,application/pdf" class="file-trigger-input file-trigger-input-secondary" />
+                        Choose PDF
+                      </label>
+                      <span class="editor-empty-hint">or drop a PDF anywhere inside this canvas</span>
+                    </div>
+                    <div class="editor-empty-pills">
+                      <span>Drag to replace</span>
+                      <span>Drag-to-edit</span>
+                      <span>Signature ready</span>
+                      <span>Instant export</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="page-stage" id="page-stage">
+                  <canvas id="pdf-canvas"></canvas>
+                  <iframe id="pdf-native-preview" title="Native PDF preview" hidden></iframe>
+                  <div class="pdf-text-hit-layer" id="pdf-text-hit-layer"></div>
+                  <div class="page-overlay-layer" id="page-overlay-layer"></div>
+                </div>
+              </div>
+            </div>
+
+            <aside class="editor-page-strip">
+              <div class="strip-header">
+                <div class="eyebrow">Page Strip</div>
+                <h2>Pages</h2>
+              </div>
+              <div class="editor-thumbnails-strip" id="editor-thumbnails-strip"></div>
+            </aside>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div class="editor-context-menu" id="editor-context-menu" hidden>
+      <button class="context-menu-item" id="context-add-whiteout" type="button">Whiteout</button>
+      <button class="context-menu-item" id="context-add-image" type="button">Add Image</button>
+      <button class="context-menu-item" id="context-add-signature" type="button">Add Signature</button>
+      <button class="context-menu-item" id="context-pan" type="button">Pan Document</button>
+    </div>
+
+    <div class="signature-modal" id="signature-modal" hidden>
+      <div class="signature-modal-backdrop" data-close-signature></div>
+      <div class="signature-modal-card">
+        <h2>Draw your signature</h2>
+        <p>Use your mouse or trackpad, then save it for placement on the PDF.</p>
+        <canvas id="signature-canvas" width="520" height="220"></canvas>
+        <div class="editor-inline-actions signature-actions">
+          <label class="button button-secondary editor-action" style="margin-right: auto;">
+            <input type="file" id="upload-signature-local" accept="image/*" hidden />
+            Upload Signature
+          </label>
+          <button class="button button-secondary editor-action" id="clear-signature" type="button">Clear</button>
+          <button class="button button-primary editor-action" id="save-signature" type="button">Save Signature</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="signature-modal" id="ocr-modal" hidden>
+      <div class="signature-modal-backdrop" data-close-ocr></div>
+      <div class="signature-modal-card" style="width: 520px;">
+        <h2 id="ocr-modal-title">Extracted Text</h2>
+        <p id="ocr-modal-status">Processing image...</p>
+        <textarea id="ocr-result-text" class="editor-input" style="width: 100%; height: 200px; resize: vertical; margin-top: 10px;" readonly></textarea>
+        <div class="editor-inline-actions signature-actions" style="margin-top: 20px;">
+          <button class="button button-secondary editor-action" data-close-ocr type="button">Close</button>
+          <button class="button button-primary editor-action" id="copy-ocr-text" type="button" disabled>Copy to Clipboard</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="signature-modal" id="payment-modal" hidden>
+      <div class="signature-modal-backdrop" id="payment-modal-backdrop"></div>
+      <div class="signature-modal-card payment-modal-card" style="text-align: center;">
+        <h2 style="margin-bottom: 8px;">&#x1F513; Unlock Lifetime Export</h2>
+        <p style="color: var(--text-muted); margin-bottom: 4px;">One-time payment &mdash; export unlimited documents forever.</p>
+        <p style="font-size: 2rem; font-weight: 800; color: var(--brand); margin: 16px 0;">&#x20B9;99 <span style="font-size: 1rem; font-weight: 400; color: var(--text-muted);">lifetime</span></p>
+        <ul style="text-align: left; list-style: none; padding: 0; margin: 0 0 24px; font-size: 0.9rem; color: var(--text-muted);">
+          <li>&#x2705; &nbsp;Unlimited PDF exports</li>
+          <li>&#x2705; &nbsp;All editing tools included</li>
+          <li>&#x2705; &nbsp;One-time charge, no subscription</li>
+        </ul>
+        <div class="editor-inline-actions signature-actions" style="margin-top: 8px; justify-content: center;">
+          <button class="button button-secondary editor-action" id="cancel-payment-button" type="button">Cancel</button>
+          <button class="button button-primary editor-action" id="proceed-payment-button" type="button">Pay &#x20B9;99 &amp; Export</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script src="https://unpkg.com/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
+    <script src="./pdf.min.js"></script>
+    <script src="./pdf-lib.min.js"></script>
+    <script src="./jszip.min.js"></script>
+    <script src="./pdf-editor.js"></script>
+  </body>
+  </html>
