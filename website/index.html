@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lumina Scan | Sign In</title>
+    <title>Lumina Scan | PDF Editing Website</title>
     <meta
       name="description"
-      content="Lumina Scan - Sign in to access your document tools."
+      content="Capture, edit, sign, and export PDFs with Lumina Scan across website and mobile."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -29,28 +29,13 @@
 
       if (authLandingType === 'recovery' && authLandingToken) {
         window.location.replace(`./reset-password.html${window.location.search}${window.location.hash}`);
-      } else {
-        // Immediate redirect for "Signin only" homepage requirement
-        (async () => {
-          try {
-            const res = await fetch('./api/auth-session');
-            const data = await res.json();
-            if (data.authenticated) {
-              window.location.replace('./pdf-editor.html');
-            } else {
-              window.location.replace('./login.html');
-            }
-          } catch (e) {
-            window.location.replace('./login.html');
-          }
-        })();
       }
     </script>
   </head>
-  <body class="auth-body">
+  <body>
     <header class="site-header">
       <div class="shell">
-        <nav class="nav">
+        <nav class="nav" data-nav>
           <a class="brand" href="./index.html">
             <img class="brand-mark" src="./app-logo.png" alt="Lumina Scan logo" />
             <div class="brand-copy">
@@ -58,20 +43,158 @@
               <span>Scan. Edit. Sign. Export.</span>
             </div>
           </a>
+
+          <div class="nav-links">
+            <a href="./index.html">Home</a>
+            <a href="./pdf-editor.html">PDF Editor</a>
+            <a href="./privacy.html">Privacy</a>
+            <a href="./terms.html">Terms</a>
+          </div>
+
+          <div class="nav-actions">
+            <a class="button button-secondary" href="./pdf-editor.html">Open PDF Editor</a>
+            <a class="button button-primary" id="nav-sign-in-link" href="./login.html">Sign In</a>
+
+            <div class="nav-user-container" id="nav-user-container" hidden>
+              <div class="nav-user-menu">
+                <button class="button button-secondary nav-user-trigger" type="button">
+                  <span id="nav-user-email-display">Account</span>
+                  <span class="nav-user-caret">▾</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </nav>
       </div>
     </header>
 
-    <main class="shell auth-page">
-      <section class="hero" style="min-height: 60vh; display: flex; align-items: center; justify-content: center; text-align: center;">
-        <div style="max-width: 600px;">
-          <div class="eyebrow" style="margin-bottom: 24px;">Welcome to Lumina Scan</div>
-          <h1 style="margin-bottom: 24px;">Capture and edit documents with ease.</h1>
-          <p style="font-size: 1.1rem; color: var(--text-soft); margin-bottom: 40px;">
-            Sign in to your account to start managing your scans, editing PDFs, and unlocking premium features.
-          </p>
-          <div class="hero-actions" style="justify-content: center;">
-            <a class="button button-primary" href="./login.html" style="padding: 16px 48px; font-size: 1.1rem;">Sign In to Continue</a>
+    <main>
+      <section class="hero">
+        <div class="shell hero-grid">
+          <div class="hero-copy">
+            <div class="eyebrow">Website + Mobile Sync</div>
+            <h1>Edit PDFs on the web with the same <span>Lumina Scan</span> account.</h1>
+            <p>
+              Upload documents, fix OCR text, place signatures, and export polished PDFs from the
+              browser while staying connected to the same Supabase-backed account used in the APK.
+            </p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="./login.html">Sign In</a>
+              <a class="button button-secondary" href="./pdf-editor.html">Try PDF Editor</a>
+            </div>
+            <div class="hero-stats">
+              <div class="stat">
+                <strong>1</strong>
+                <span>Shared account system for website and mobile</span>
+              </div>
+              <div class="stat">
+                <strong>PDF</strong>
+                <span>Edit, sign, and export in one place</span>
+              </div>
+              <div class="stat">
+                <strong>Live</strong>
+                <span>Password reset and auth now work on the website flow</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-panel">
+            <div class="panel-card preview-card">
+              <div class="preview-toolbar">
+                <span class="pill brand">Edit</span>
+                <span class="pill soft">Enhance</span>
+                <span class="pill soft">Sign</span>
+                <span class="pill soft">Export</span>
+              </div>
+              <div class="preview-page">
+                <div class="scan-line"></div>
+                <div class="scan-line"></div>
+                <div class="scan-line short"></div>
+                <div class="page-sheet">
+                  <div class="scan-line"></div>
+                  <div class="scan-line short"></div>
+                  <div class="signature-mark"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="floating-stack">
+              <div class="panel-card mini-card">
+                <h4>Account-linked website access</h4>
+                <p>Sign in with the same Lumina Scan email and continue editing from the web.</p>
+              </div>
+              <div class="panel-card mini-card">
+                <h4>Dedicated password recovery</h4>
+                <p>Recovery links now forward users into the reset-password screen on the site.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="shell">
+          <div class="section-header">
+            <h2>Everything needed for the website flow.</h2>
+            <p>
+              The homepage, sign-in screens, forgot-password page, reset-password page, and PDF
+              editor now live as separate website routes instead of collapsing into a single auth
+              gate.
+            </p>
+          </div>
+
+          <div class="feature-grid">
+            <article class="feature-card">
+              <h3>Public homepage</h3>
+              <p>Visitors can land on the website first, read about the product, and choose when to sign in.</p>
+            </article>
+            <article class="feature-card">
+              <h3>Dedicated auth screens</h3>
+              <p>Login, forgot-password, and reset-password each have their own route and user flow.</p>
+            </article>
+            <article class="feature-card">
+              <h3>Shared Supabase backend</h3>
+              <p>The website and APK app continue using the same Supabase project and account system.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="shell">
+          <div class="section-header">
+            <h2>Download for Mobile.</h2>
+            <p>
+              Get Lumina Scan on Android and iPhone when the store listings go live.
+            </p>
+          </div>
+
+          <div class="download-grid">
+            <article class="feature-card">
+              <div class="eyebrow">Android App</div>
+              <h3>Google Play</h3>
+              <p>Add your final Play Store listing URL here when the APK is published.</p>
+              <a class="store-badge google-play-badge" href="#play-store-placeholder" aria-label="Google Play placeholder">
+                <span class="store-icon">▶</span>
+                <span class="store-copy">
+                  <small>GET IT ON</small>
+                  <strong>Google Play</strong>
+                </span>
+              </a>
+            </article>
+
+            <article class="feature-card">
+              <div class="eyebrow">iPhone App</div>
+              <h3>Apple App Store</h3>
+              <p>Add your final App Store listing URL here when the iOS app is published.</p>
+              <a class="store-badge apple-store-badge" href="#app-store-placeholder" aria-label="App Store placeholder">
+                <span class="store-icon"></span>
+                <span class="store-copy">
+                  <small>DOWNLOAD ON THE</small>
+                  <strong>App Store</strong>
+                </span>
+              </a>
+            </article>
           </div>
         </div>
       </section>
@@ -86,6 +209,7 @@
         <div class="footer-links">
           <a href="./privacy.html">Privacy Policy</a>
           <a href="./terms.html">Terms &amp; Conditions</a>
+          <a href="./contact.html">Contact</a>
         </div>
       </div>
     </footer>

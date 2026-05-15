@@ -108,11 +108,13 @@ const flagCredentialError = (message = 'Password or email is Wrong') => {
 const setMode = (mode) => {
   authMode = mode;
   const signInActive = mode === 'sign-in';
+  const signUpActive = mode === 'sign-up';
   const updateActive = mode === 'update-password';
 
   modeSignIn?.classList.toggle('active', signInActive);
+  modeSignUp?.classList.toggle('active', signUpActive);
   
-  if (fullNameField) fullNameField.hidden = true;
+  if (fullNameField) fullNameField.hidden = !signUpActive;
   if (newPasswordField) newPasswordField.hidden = !updateActive;
   
   // Hide normal email/password fields if updating password
@@ -122,8 +124,10 @@ const setMode = (mode) => {
 
   if (submitButton) {
     if (signInActive) submitButton.textContent = 'Sign In';
+    else if (signUpActive) submitButton.textContent = 'Create Account';
     else if (updateActive) submitButton.textContent = 'Update Password';
   }
+
 };
 
 const brandSecondary = document.querySelector('.brand-copy span');
@@ -246,7 +250,14 @@ const handleSubmit = async (event) => {
   submitButton.disabled = true;
   clearMessage();
   clearFieldErrors();
-  showMessage(authMode === 'sign-in' ? 'Signing in...' : 'Updating password...', 'info');
+  showMessage(
+    authMode === 'sign-in'
+      ? 'Signing in...'
+      : authMode === 'sign-up'
+        ? 'Creating your account...'
+        : 'Updating password...',
+    'info'
+  );
 
   try {
     if (authMode === 'update-password') {
@@ -265,8 +276,11 @@ const handleSubmit = async (event) => {
       return;
     }
 
-    const endpoint = './auth/sign-in';
+    const endpoint = authMode === 'sign-up' ? './auth/sign-up' : './auth/sign-in';
     const payload = new URLSearchParams();
+    if (authMode === 'sign-up') {
+      payload.set('full_name', fullName);
+    }
     payload.set('email', email);
     payload.set('password', password);
 
@@ -300,6 +314,14 @@ const handleSubmit = async (event) => {
       window.setTimeout(() => {
         window.location.href = data?.redirect || './index.html';
       }, 500);
+    } else if (authMode === 'sign-up') {
+      if (data?.redirect) {
+        window.setTimeout(() => {
+          window.location.href = data.redirect;
+        }, 700);
+      } else {
+        setMode('sign-in');
+      }
     } else if (data?.redirect) {
       window.setTimeout(() => {
         window.location.href = data.redirect;
@@ -374,16 +396,32 @@ if (window.location.hash.includes('type=recovery')) {
   setMode('update-password');
 }
 authForm.addEventListener('submit', handleSubmit);
-submitButton.addEventListener('click', handleSubmit);
-if (forgotPasswordButton?.tagName === 'BUTTON') {
-  forgotPasswordButton.addEventListener('click', handleForgotPassword);
-}
-modeSignIn?.addEventListener('click', (event) => {
-  if (modeSignIn.tagName === 'BUTTON') {
+submitButton?.addEventListener('click', handleSubmit);
+submitButton?.addEventListener('pointerup', handleSubmit);
+submitButton?.addEventListener(
+  'touchend',
+  (event) => {
     event.preventDefault();
+    handleSubmit(event);
+  },
+  { passive: false }
+);
+
+if (forgotPasswordButton) {
+  forgotPasswordButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    handleForgotPassword();
+  });
+}
+
+if (modeSignIn) {
+  modeSignIn.addEventListener('click', () => {
+    clearMessage();
+    clearFieldErrors();
     setMode('sign-in');
-  }
-});
+  });
+}
+
 initAuth();
 
 [emailInput, passwordInput, fullNameInput].forEach((input) => {

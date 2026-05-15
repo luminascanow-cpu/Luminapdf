@@ -161,6 +161,17 @@ const getRequestOrigin = (req) => {
 };
 
 const getPublicWebsiteOrigin = (req) => {
+  const requestOrigin = getRequestOrigin(req);
+  const requestHost = String(req.headers.host || '').toLowerCase();
+  const isLocalRequest =
+    requestHost.includes('localhost') ||
+    requestHost.startsWith('127.0.0.1') ||
+    requestHost.startsWith('[::1]');
+
+  if (isLocalRequest) {
+    return requestOrigin;
+  }
+
   const configuredOrigin =
     process.env.WEBSITE_PUBLIC_URL ||
     process.env.LUMINA_WEBSITE_URL ||
@@ -171,7 +182,7 @@ const getPublicWebsiteOrigin = (req) => {
     return configuredOrigin.replace(/\/+$/, '');
   }
 
-  return getRequestOrigin(req);
+  return requestOrigin;
 };
 
 const createAuthSession = (authData = {}) => {
@@ -250,20 +261,49 @@ const renderAuthResultPage = ({ title, message, success, actionHref, actionLabel
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escapeHtml(title)} | Lumina Scan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body class="auth-body">
+    <header class="site-header">
+      <div class="shell">
+        <nav class="nav">
+          <a class="brand" href="./index.html">
+            <img class="brand-mark" src="./app-logo.png" alt="Lumina Scan logo" />
+            <div class="brand-copy">
+              <strong>Lumina Scan</strong>
+              <span>${success ? 'Authentication complete' : 'Authentication issue'}</span>
+            </div>
+          </a>
+          <div class="nav-links">
+            <a href="./index.html">Home</a>
+            <a href="./login.html">Sign In</a>
+            <a href="./pdf-editor.html">PDF Editor</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
     <main class="shell auth-page">
-      <section class="auth-grid" style="grid-template-columns: 1fr; max-width: 760px; margin: 0 auto;">
-        <article class="auth-form-card">
+      <section class="auth-grid" style="grid-template-columns: 1fr; max-width: 840px; margin: 0 auto;">
+        <article class="auth-form-card" style="padding: 34px;">
           <div class="eyebrow">${success ? 'Supabase Connected' : 'Authentication Error'}</div>
-          <h1 style="margin-top: 18px;">${escapeHtml(title)}</h1>
-          <div class="auth-message ${success ? 'is-success' : 'is-error'}" style="display:block;">
+          <h1 style="margin: 18px 0 12px;">${escapeHtml(title)}</h1>
+          <p style="margin: 0 0 18px; color: var(--muted); line-height: 1.8;">
+            ${success ? 'Your website authentication request completed successfully.' : 'The website could not complete that sign-in request. You can go back and try again right away.'}
+          </p>
+          <div class="auth-message ${success ? 'is-success' : 'is-error'}" style="display:block; margin-top: 0;">
             ${escapeHtml(message)}
           </div>
-          <div class="editor-inline-actions" style="margin-top: 22px;">
+          <div class="editor-inline-actions" style="margin-top: 24px; flex-wrap: wrap;">
             <a class="button button-primary" href="${escapeHtml(actionHref)}">${escapeHtml(actionLabel)}</a>
-            <a class="button button-secondary" href="./index.html">Back Home</a>
+            <a class="button button-secondary" href="./login.html">Back To Login</a>
+            <a class="button button-ghost" href="./index.html">Back Home</a>
           </div>
         </article>
       </section>
@@ -378,10 +418,6 @@ const resolveFile = (requestUrl) => {
 
   if (!normalized.startsWith(root)) {
     return null;
-  }
-
-  if (cleanUrl === '/signup.html') {
-    return 'REDIRECT:./login.html';
   }
 
   if (fs.existsSync(normalized) && fs.statSync(normalized).isFile()) {
@@ -505,14 +541,14 @@ const server = http.createServer((req, res) => {
             {
               success: true,
               message: `Signed in successfully as ${email}.`,
-              redirect: './index.html',
+              redirect: './my-account.html',
             },
             { ...noCacheHeaders, 'Set-Cookie': cookie }
           );
           return;
         }
         res.writeHead(302, {
-          Location: './index.html?auth=signin-success',
+          Location: './my-account.html?auth=signin-success',
           'Set-Cookie': cookie,
           ...noCacheHeaders,
         });

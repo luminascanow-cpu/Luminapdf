@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Account | Lumina Scan</title>
+    <meta
+      name="description"
+      content="Manage your Lumina Scan website account, subscription status, and document tools."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="shell">
+        <nav class="nav">
+          <a class="brand" href="./index.html">
+            <img class="brand-mark" src="./app-logo.png" alt="Lumina Scan logo" />
+            <div class="brand-copy">
+              <strong>Lumina Scan</strong>
+              <span>Account workspace</span>
+            </div>
+          </a>
+
+          <div class="nav-links">
+            <a href="./index.html">Home</a>
+            <a href="./pdf-editor.html">PDF Editor</a>
+            <a href="./privacy.html">Privacy</a>
+            <a href="./terms.html">Terms</a>
+          </div>
+
+          <div class="nav-actions">
+            <a class="button button-secondary" href="./pdf-editor.html">Open PDF Editor</a>
+            <button class="button button-primary" id="account-sign-out" type="button">Sign Out</button>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main class="section">
+      <div class="shell">
+        <section class="page-hero account-hero">
+          <div class="account-hero-copy">
+            <div class="eyebrow">My Account</div>
+            <h1>Your Lumina Scan control room.</h1>
+            <p>
+              Review your profile, check website access status, and jump directly into editing or
+              password recovery without leaving the website.
+            </p>
+          </div>
+          <div class="account-hero-badge" id="account-status-badge">Checking account...</div>
+        </section>
+
+        <section class="account-grid">
+          <article class="account-card account-profile-card">
+            <div class="account-card-header">
+              <div>
+                <div class="eyebrow">Profile</div>
+                <h2>Account details</h2>
+              </div>
+              <div class="account-avatar" id="account-avatar">LS</div>
+            </div>
+
+            <div class="account-meta">
+              <div class="account-meta-row">
+                <span>Name</span>
+                <strong id="account-name">Loading...</strong>
+              </div>
+              <div class="account-meta-row">
+                <span>Email</span>
+                <strong id="account-email">Loading...</strong>
+              </div>
+              <div class="account-meta-row">
+                <span>User ID</span>
+                <strong id="account-user-id">Loading...</strong>
+              </div>
+            </div>
+          </article>
+
+          <article class="account-card account-plan-card">
+            <div class="account-card-header">
+              <div>
+                <div class="eyebrow">Access</div>
+                <h2>Subscription status</h2>
+              </div>
+            </div>
+
+            <div class="account-plan-pill" id="account-plan-pill">Checking access...</div>
+            <p class="account-plan-copy" id="account-plan-copy">
+              We are checking whether this account has lifetime website access.
+            </p>
+          </article>
+
+          <article class="account-card account-actions-card">
+            <div class="account-card-header">
+              <div>
+                <div class="eyebrow">Quick Actions</div>
+                <h2>Continue working</h2>
+              </div>
+            </div>
+
+            <div class="account-action-stack">
+              <a class="button button-primary" href="./pdf-editor.html">Open PDF Editor</a>
+              <a class="button button-secondary" href="./forgot-password.html">Change Password</a>
+              <button class="button button-ghost account-sign-out-secondary" id="account-sign-out-secondary" type="button">Sign Out</button>
+            </div>
+          </article>
+
+          <article class="account-card account-note-card">
+            <div class="account-card-header">
+              <div>
+                <div class="eyebrow">Website Status</div>
+                <h2>Shared backend</h2>
+              </div>
+            </div>
+            <p>
+              This website account uses the same Supabase-backed identity as your Lumina Scan app,
+              so the same email can work across mobile and web.
+            </p>
+          </article>
+        </section>
+      </div>
+    </main>
+
+    <script src="./my-account.js"></script>
+  </body>
+</html>

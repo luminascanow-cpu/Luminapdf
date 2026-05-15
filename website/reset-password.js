@@ -3,14 +3,18 @@ const resetEmailValue = document.getElementById('reset-email-value');
 const resetForm = document.getElementById('reset-password-form');
 const newPasswordInput = document.getElementById('new-password');
 const confirmPasswordInput = document.getElementById('confirm-password');
-const resetSubmit = document.getElementById('reset-password-submit');
-const resetMessage = document.getElementById('reset-password-message');
+const resetSubmit = document.getElementById('submit-btn');
+const notif = document.getElementById('notification');
+const notifText = document.getElementById('notif-text');
+const overlay = document.getElementById('loadingOverlay');
 
 const showResetMessage = (message, tone = 'info') => {
-  if (!resetMessage) return;
-  resetMessage.hidden = false;
-  resetMessage.textContent = message;
-  resetMessage.className = `auth-message is-${tone}`;
+  if (!notifText) return;
+  notifText.textContent = message;
+  notif.className = 'show ' + (tone === 'error' ? 'notif-error' : (tone === 'success' ? 'notif-success' : ''));
+  if (tone !== 'info') {
+      setTimeout(() => notif.className = '', 4000);
+  }
 };
 
 const getParamsFromUrl = (url) => {
@@ -28,14 +32,7 @@ const getParamsFromUrl = (url) => {
       errorDescription: queryParams.get('error_description') ?? hashParams.get('error_description'),
     };
   } catch {
-    return {
-      accessToken: null,
-      refreshToken: null,
-      tokenHash: null,
-      type: null,
-      errorCode: null,
-      errorDescription: null,
-    };
+    return { accessToken: null, refreshToken: null, tokenHash: null, type: null, errorCode: null, errorDescription: null };
   }
 };
 
@@ -48,15 +45,10 @@ const initializeResetSession = async () => {
   }
 
   resetSupabase = window.supabase.createClient(resetConfig.supabaseUrl, resetConfig.supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
   });
 
-  const { accessToken, refreshToken, tokenHash, type, errorCode, errorDescription } =
-    getParamsFromUrl(window.location.href);
+  const { accessToken, refreshToken, tokenHash, type, errorCode, errorDescription } = getParamsFromUrl(window.location.href);
 
   if (errorCode) {
     showResetMessage(errorDescription || 'This reset link is invalid or expired.', 'error');
@@ -65,16 +57,10 @@ const initializeResetSession = async () => {
 
   try {
     if (accessToken && refreshToken) {
-      const { error } = await resetSupabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
+      const { error } = await resetSupabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
       if (error) throw error;
     } else if (tokenHash && type === 'recovery') {
-      const { error } = await resetSupabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type: 'recovery',
-      });
+      const { error } = await resetSupabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
       if (error) throw error;
     }
 
@@ -112,7 +98,7 @@ resetForm?.addEventListener('submit', async (event) => {
   }
 
   resetSubmit.disabled = true;
-  showResetMessage('Updating your password...', 'info');
+  overlay.style.display = 'flex';
 
   try {
     const { error } = await resetSupabase.auth.updateUser({ password: newPassword });
@@ -121,11 +107,11 @@ resetForm?.addEventListener('submit', async (event) => {
     showResetMessage('Password updated successfully. Redirecting to sign in...', 'success');
     window.setTimeout(() => {
       window.location.href = './login.html?auth=reset-success';
-    }, 900);
+    }, 1500);
   } catch (error) {
     showResetMessage(error.message || 'We could not update your password.', 'error');
-  } finally {
     resetSubmit.disabled = false;
+    overlay.style.display = 'none';
   }
 });
 

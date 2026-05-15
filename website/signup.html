@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In | Lumina Scan</title>
+    <title>Create Account | Lumina Scan</title>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -81,7 +81,6 @@
             color: white;
             font-weight: 700;
             font-size: 1.25rem;
-            letter-spacing: -0.02em;
         }
 
         .logo img {
@@ -104,43 +103,64 @@
         /* Auth Layout */
         .auth-container {
             flex: 1;
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             align-items: center;
-            justify-content: center;
-            padding: 3rem 1.5rem;
+            gap: 4rem;
+            padding: 3rem 4rem;
+            max-width: 1280px;
+            margin: 0 auto;
         }
 
+        .auth-hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(to bottom right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .auth-hero p {
+            color: var(--text-dim);
+            font-size: 1.125rem;
+            line-height: 1.6;
+            margin-bottom: 2.5rem;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 1.25rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+        }
+
+        .feature-icon {
+            padding: 0.5rem;
+            background: rgba(139, 92, 246, 0.1);
+            border-radius: 10px;
+            color: var(--primary);
+        }
+
+        .feature-text h3 { font-size: 1rem; margin-bottom: 0.25rem; }
+        .feature-text p { font-size: 0.9rem; margin: 0; color: var(--text-dim); }
+
+        /* Auth Card */
         .auth-card {
             background: var(--card-bg);
             backdrop-filter: blur(var(--glass-blur));
             border: 1px solid var(--border);
             width: 100%;
-            max-width: 480px;
             border-radius: 24px;
             padding: 2.5rem;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
 
-        .auth-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        .auth-header h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(to right, #fff, #94a3b8);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .auth-header p {
-            color: var(--text-dim);
-            font-size: 0.95rem;
-        }
-
-        /* Tabs */
         .auth-tabs {
             display: flex;
             background: rgba(15, 23, 42, 0.6);
@@ -172,15 +192,11 @@
             border: 1px solid var(--border);
         }
 
-        /* Form Elements */
-        .input-group {
-            margin-bottom: 1.5rem;
-            position: relative;
-        }
-
+        /* Form */
+        .input-group { margin-bottom: 1.25rem; }
         .input-group label {
             display: block;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: 600;
             color: var(--text-dim);
             margin-bottom: 0.5rem;
@@ -199,7 +215,6 @@
             left: 1rem;
             color: var(--text-dim);
             width: 18px;
-            height: 18px;
         }
 
         .input-wrapper input {
@@ -207,7 +222,7 @@
             background: rgba(15, 23, 42, 0.6);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 0.875rem 1rem 0.875rem 3rem;
+            padding: 0.75rem 1rem 0.75rem 3rem;
             color: white;
             font-size: 0.95rem;
             transition: all 0.2s;
@@ -217,37 +232,48 @@
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
-            background: rgba(15, 23, 42, 0.8);
         }
 
-        .pw-toggle {
-            position: absolute;
-            right: 1rem;
-            background: none;
-            border: none;
-            color: var(--text-dim);
-            cursor: pointer;
-            padding: 4px;
+        /* Strength Meter */
+        .strength-meter {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 2px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+
+        #strength-bar {
+            height: 100%;
+            width: 0%;
+            transition: all 0.3s;
+        }
+
+        /* Checkbox */
+        .checkbox-group {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            line-height: 1.4;
         }
 
-        .pw-toggle:hover { color: white; }
+        .checkbox-group input {
+            margin-top: 0.1rem;
+            cursor: pointer;
+        }
 
-        /* Actions */
-        .forgot-pw {
-            display: block;
-            text-align: right;
-            margin-top: -1rem;
-            margin-bottom: 1.5rem;
+        .checkbox-group a {
             color: var(--primary);
             text-decoration: none;
-            font-size: 0.85rem;
             font-weight: 500;
         }
 
-        .forgot-pw:hover { text-decoration: underline; }
+        .checkbox-group a:hover { text-decoration: underline; }
 
+        /* Buttons */
         .submit-btn {
             width: 100%;
             background: var(--primary);
@@ -265,42 +291,20 @@
             gap: 0.5rem;
         }
 
-        .submit-btn:hover {
-            background: var(--primary-hover);
-            transform: translateY(-1px);
-        }
+        .submit-btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
 
-        .submit-btn:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-        }
-
-        /* Divider */
         .divider {
             display: flex;
             align-items: center;
-            margin: 2rem 0;
+            margin: 1.5rem 0;
             color: var(--text-dim);
-            font-size: 0.8rem;
-            font-weight: 500;
+            font-size: 0.75rem;
         }
 
-        .divider::before, .divider::after {
-            content: "";
-            flex: 1;
-            height: 1px;
-            background: var(--border);
-        }
-
+        .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
         .divider span { padding: 0 1rem; }
 
-        /* Social Buttons */
-        .social-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-
+        .social-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .social-btn {
             background: rgba(15, 23, 42, 0.6);
             border: 1px solid var(--border);
@@ -311,32 +315,15 @@
             justify-content: center;
             gap: 0.5rem;
             color: white;
-            font-size: 0.9rem;
-            font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
-        }
-
-        .social-btn:hover {
-            background: rgba(30, 41, 59, 0.8);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-
-        /* Footer */
-        .auth-footer {
-            text-align: center;
-            margin-top: 2rem;
-            color: var(--text-dim);
             font-size: 0.9rem;
         }
 
-        .auth-footer a {
-            color: var(--primary);
-            font-weight: 600;
-            text-decoration: none;
-        }
+        .social-btn:hover { background: rgba(30, 41, 59, 0.8); }
 
-        .auth-footer a:hover { text-decoration: underline; }
+        .auth-footer { text-align: center; margin-top: 1.5rem; color: var(--text-dim); font-size: 0.9rem; }
+        .auth-footer a { color: var(--primary); font-weight: 600; text-decoration: none; }
 
         /* Notification */
         #notification {
@@ -354,27 +341,17 @@
             transform: translateY(200%);
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             z-index: 1000;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
 
         #notification.show { transform: translateY(0); }
-        .notif-error { border-color: rgba(239, 68, 68, 0.5) !important; color: #fca5a5; }
+        .notif-error { border-color: rgba(239, 68, 68, 0.5); color: #fca5a5; }
 
-        /* Validation Styles */
         .is-invalid input { border-color: #ef4444 !important; }
-        .error-hint { color: #ef4444; font-size: 0.75rem; margin-top: 0.25rem; display: none; }
-        .is-invalid .error-hint { display: block; }
 
-        /* Loading */
-        .loading-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(4px);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
+        @media (max-width: 968px) {
+            .auth-container { grid-template-columns: 1fr; padding: 2rem 1.5rem; gap: 2rem; }
+            .auth-hero { text-align: center; }
+            .auth-hero h1 { font-size: 2.5rem; }
         }
     </style>
 </head>
@@ -390,54 +367,91 @@
         <nav>
             <a href="./index.html">Home</a>
             <a href="./pdf-editor.html">PDF Editor</a>
-            <a href="./privacy.html">Privacy</a>
+            <a href="./login.html">Sign In</a>
         </nav>
     </header>
 
     <main class="auth-container">
+        <div class="auth-hero">
+            <h1>Start Scanning with <span>Lumina Scan</span></h1>
+            <p>Join thousands of users digitizing their documents with bank-level security and seamless cloud sync.</p>
+            
+            <div class="feature-item">
+                <div class="feature-icon"><i data-lucide="edit-3"></i></div>
+                <div class="feature-text">
+                    <h3>Advanced PDF Editor</h3>
+                    <p>Edit text, place signatures, and annotate directly in your browser.</p>
+                </div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-icon"><i data-lucide="refresh-cw"></i></div>
+                <div class="feature-text">
+                    <h3>Global Cloud Sync</h3>
+                    <p>Access your documents across website and mobile instantly.</p>
+                </div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-icon"><i data-lucide="shield-check"></i></div>
+                <div class="feature-text">
+                    <h3>Bank-Level Security</h3>
+                    <p>Your data is encrypted and protected with industry-leading standards.</p>
+                </div>
+            </div>
+        </div>
+
         <div class="auth-card">
-            <div class="auth-header">
-                <h1>Welcome Back</h1>
-                <p>Sign in to your Lumina Scan account</p>
-            </div>
-
             <div class="auth-tabs">
-                <button class="auth-tab active" type="button">Sign In</button>
-                <a class="auth-tab" href="./signup.html">Sign Up</a>
+                <a class="auth-tab" href="./login.html">Sign In</a>
+                <button class="auth-tab active" type="button">Sign Up</button>
             </div>
 
-            <form id="login-form" action="./auth/sign-in" method="post">
+            <form id="signup-form" action="./auth/sign-up" method="post">
+                <div class="input-group" id="group-name">
+                    <label for="full-name">Full Name</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="user"></i>
+                        <input type="text" id="full-name" placeholder="John Doe" required>
+                    </div>
+                </div>
+
                 <div class="input-group" id="group-email">
                     <label for="email">Email Address</label>
                     <div class="input-wrapper">
                         <i data-lucide="mail"></i>
                         <input type="email" id="email" placeholder="name@company.com" required>
                     </div>
-                    <p class="error-hint">Please enter a valid email address</p>
                 </div>
 
                 <div class="input-group" id="group-password">
                     <label for="password">Password</label>
                     <div class="input-wrapper">
                         <i data-lucide="lock"></i>
-                        <input type="password" id="password" placeholder="••••••••" required>
+                        <input type="password" id="password" placeholder="At least 8 characters" required>
                         <button type="button" class="pw-toggle" id="pw-toggle">
                             <i data-lucide="eye"></i>
                         </button>
                     </div>
-                    <p class="error-hint">Password is required</p>
+                    <div class="strength-meter"><div id="strength-bar"></div></div>
                 </div>
 
-                <a href="./forgot-password.html" class="forgot-pw">Forgot password?</a>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="terms" required>
+                    <label>
+                        I agree to the <a href="./terms.html" target="_blank">Terms of Service</a> and 
+                        <a href="./privacy.html" target="_blank">Privacy Policy</a>.
+                    </label>
+                </div>
 
                 <button type="submit" class="submit-btn" id="submit-btn">
-                    <span>Sign In</span>
+                    <span>Create Account</span>
                     <i data-lucide="arrow-right"></i>
                 </button>
             </form>
 
             <p class="auth-footer">
-                Don't have an account? <a href="./signup.html">Create one</a>
+                Already have an account? <a href="./login.html">Log In</a>
             </p>
         </div>
     </main>
@@ -447,23 +461,18 @@
         <span id="notif-text"></span>
     </div>
 
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="submit-btn" style="width: auto; padding: 1rem 2rem;">
-            <i data-lucide="loader-2" class="animate-spin"></i>
-            Loading...
-        </div>
-    </div>
-
     <script>
         lucide.createIcons();
 
-        const form = document.getElementById('login-form');
+        const form = document.getElementById('signup-form');
+        const nameInput = document.getElementById('full-name');
         const emailInput = document.getElementById('email');
         const passInput = document.getElementById('password');
+        const termsInput = document.getElementById('terms');
         const submitBtn = document.getElementById('submit-btn');
+        const strengthBar = document.getElementById('strength-bar');
         const notif = document.getElementById('notification');
         const notifText = document.getElementById('notif-text');
-        const overlay = document.getElementById('loadingOverlay');
 
         function showNotif(text, type = 'info') {
             notifText.textContent = text;
@@ -478,35 +487,43 @@
             lucide.createIcons();
         });
 
-        const submitLogin = async (e) => {
+        passInput.addEventListener('input', () => {
+            const val = passInput.value;
+            let score = 0;
+            if (val.length >= 8) score += 25;
+            if (/[A-Z]/.test(val)) score += 25;
+            if (/[0-9]/.test(val)) score += 25;
+            if (/[^A-Za-z0-9]/.test(val)) score += 25;
+            strengthBar.style.width = score + '%';
+            if (score <= 25) strengthBar.style.background = '#ef4444';
+            else if (score <= 50) strengthBar.style.background = '#f59e0b';
+            else if (score <= 75) strengthBar.style.background = '#3b82f6';
+            else strengthBar.style.background = '#22c55e';
+        });
+
+        const submitSignup = async (e) => {
             e.preventDefault();
-            
             let isValid = true;
             document.querySelectorAll('.input-group').forEach(g => g.classList.remove('is-invalid'));
 
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(emailInput.value)) {
-                document.getElementById('group-email').classList.add('is-invalid');
-                isValid = false;
-            }
-
-            if (!passInput.value) {
-                document.getElementById('group-password').classList.add('is-invalid');
-                isValid = false;
-            }
+            if (!nameInput.value.trim()) { document.getElementById('group-name').classList.add('is-invalid'); isValid = false; }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value)) { document.getElementById('group-email').classList.add('is-invalid'); isValid = false; }
+            if (passInput.value.length < 8) { document.getElementById('group-password').classList.add('is-invalid'); isValid = false; }
+            if (!termsInput.checked) { showNotif('Please agree to the terms', 'error'); isValid = false; }
 
             if (!isValid) return;
 
             submitBtn.disabled = true;
-            overlay.style.display = 'flex';
+            submitBtn.innerHTML = 'Creating...';
             
             try {
                 const payload = new URLSearchParams({
+                    full_name: nameInput.value.trim(),
                     email: emailInput.value.trim().toLowerCase(),
                     password: passInput.value
                 });
 
-                const res = await fetch('./auth/sign-in', {
+                const res = await fetch('./auth/sign-up', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
@@ -517,34 +534,28 @@
                 });
 
                 const data = await res.json().catch(() => ({}));
-
                 if (res.ok && data.success) {
-                    showNotif('Success! Redirecting...', 'success');
-                    setTimeout(() => window.location.href = data.redirect || './my-account.html', 1000);
+                    showNotif('Account created! Redirecting...', 'success');
+                    setTimeout(() => window.location.href = data.redirect || './my-account.html', 1500);
                 } else {
-                    showNotif(data.message || 'Login failed', 'error');
+                    showNotif(data.message || 'Signup failed', 'error');
                 }
             } catch (err) {
                 showNotif('Connection error. Try again later.', 'error');
             } finally {
                 submitBtn.disabled = false;
-                overlay.style.display = 'none';
+                submitBtn.innerHTML = 'Create Account <i data-lucide="arrow-right"></i>';
+                lucide.createIcons();
             }
         };
 
-        form.addEventListener('submit', submitLogin);
-        submitBtn.addEventListener('click', submitLogin);
-        submitBtn.addEventListener('pointerup', submitLogin);
+        form.addEventListener('submit', submitSignup);
+        submitBtn.addEventListener('click', submitSignup);
+        submitBtn.addEventListener('pointerup', submitSignup);
         submitBtn.addEventListener('touchend', (e) => {
             e.preventDefault();
-            submitLogin(e);
+            submitSignup(e);
         }, { passive: false });
-
-        // Check for success message from signup
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('auth') === 'signup-success') {
-            showNotif('Account created! Please sign in.', 'success');
-        }
     </script>
 </body>
 </html>
