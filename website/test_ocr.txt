@@ -1,0 +1,1 @@
+This is a test PDF document for OCR extraction. LuminaScan is awesome.

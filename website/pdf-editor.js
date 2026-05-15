@@ -2646,139 +2646,17 @@ const exportPdfContent = async () => {
   }
 };
 
-// Track lifetime payment status in session
-let hasLifetimeAccess = false;
-
-const checkLifetimeAccess = async () => {
-  try {
-    const res = await fetch('/api/check-payment-status');
-    const data = await res.json();
-    hasLifetimeAccess = !!data.hasPaid;
-  } catch (e) {
-    hasLifetimeAccess = false;
-  }
-};
-
-// Check on page load
-void checkLifetimeAccess();
+// checkLifetimeAccess removed for now
 
 elements.downloadButton.addEventListener('click', async () => {
   if (!state.sourceBytes || !hasPdfLib()) return;
-  // Re-check in case status changed
-  await checkLifetimeAccess();
-  if (hasLifetimeAccess) {
-    // Already paid — export directly without showing payment modal
-    await exportPdfContent();
-    return;
-  }
-  if (elements.paymentModal) {
-    elements.paymentModal.hidden = false;
-  }
+  // Payment disabled for now - export directly
+  await exportPdfContent();
 });
 
-if (elements.cancelPaymentButton) {
-  elements.cancelPaymentButton.addEventListener('click', () => {
-    if (elements.paymentModal) elements.paymentModal.hidden = true;
-  });
-}
+// Payment event listeners removed for now
 
-if (elements.paymentModalBackdrop) {
-  elements.paymentModalBackdrop.addEventListener('click', () => {
-    if (elements.paymentModal) elements.paymentModal.hidden = true;
-  });
-}
-
-if (elements.proceedPaymentButton) {
-  elements.proceedPaymentButton.addEventListener('click', async () => {
-    try {
-      elements.proceedPaymentButton.disabled = true;
-      elements.proceedPaymentButton.textContent = 'Processing...';
-
-      const response = await fetch('/api/create-payment-order', {
-        method: 'POST',
-      });
-      const orderData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(orderData.error || 'Failed to create payment order');
-      }
-
-      const options = {
-        key: orderData.key,
-        amount: orderData.amount,
-        currency: orderData.currency,
-        name: 'LuminaScan',
-        description: 'Lifetime Export Access',
-        order_id: orderData.orderId,
-        handler: async function (rzpResponse) {
-          // Confirm lifetime access on the server
-          if (elements.proceedPaymentButton) {
-            elements.proceedPaymentButton.textContent = 'Verifying Payment...';
-            elements.proceedPaymentButton.disabled = true;
-          }
-
-          try {
-            const confirmResponse = await fetch('/api/confirm-payment', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                paymentId: rzpResponse.razorpay_payment_id,
-                orderId: rzpResponse.razorpay_order_id,
-                signature: rzpResponse.razorpay_signature,
-              }),
-            });
-
-            if (!confirmResponse.ok) {
-              const errorData = await confirmResponse.json().catch(() => ({}));
-              throw new Error(errorData.error || 'Payment confirmation failed on server.');
-            }
-
-            hasLifetimeAccess = true;
-            alert('Success! Lifetime export access has been activated.');
-
-            if (elements.paymentModal) elements.paymentModal.hidden = true;
-            await exportPdfContent();
-          } catch (e) {
-            console.error('[Payment] Confirmation failed:', e);
-            alert('Verification Error: ' + e.message + '\nPlease contact support if the payment was deducted.');
-          } finally {
-            if (elements.proceedPaymentButton) {
-              elements.proceedPaymentButton.disabled = false;
-              elements.proceedPaymentButton.textContent = 'Pay \u20B999 & Export';
-            }
-          }
-        },
-        prefill: {
-          name: 'LuminaScan User',
-        },
-        theme: {
-          color: '#10a37f'
-        },
-        modal: {
-          ondismiss: function () {
-            elements.proceedPaymentButton.disabled = false;
-            elements.proceedPaymentButton.textContent = 'Pay \u20B999 & Export';
-          }
-        }
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', function (response) {
-        console.error('Payment failed', response.error);
-        alert('Payment failed. Please try again.');
-        elements.proceedPaymentButton.disabled = false;
-        elements.proceedPaymentButton.textContent = 'Pay \u20B999 & Export';
-      });
-      rzp.open();
-
-    } catch (error) {
-      console.error('Payment Error:', error);
-      alert(error.message || 'An error occurred during payment setup.');
-      elements.proceedPaymentButton.disabled = false;
-      elements.proceedPaymentButton.textContent = 'Pay \u20B999 & Export';
-    }
-  });
-}
+// proceedPaymentButton logic removed for now
 
 // Signature Upload Handler
 if (elements.signatureUploadInput) {
