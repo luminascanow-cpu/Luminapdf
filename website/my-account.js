@@ -1,14 +1,30 @@
 const accountName = document.getElementById('account-name');
 const accountEmail = document.getElementById('account-email');
-const accountUserId = document.getElementById('account-user-id');
 const accountAvatar = document.getElementById('account-avatar');
 const accountStatusBadge = document.getElementById('account-status-badge');
 const accountPlanPill = document.getElementById('account-plan-pill');
 const accountPlanCopy = document.getElementById('account-plan-copy');
+const nav = document.querySelector('[data-nav]');
+const toggle = document.querySelector('[data-menu-toggle]');
 const signOutButtons = [
   document.getElementById('account-sign-out'),
   document.getElementById('account-sign-out-secondary'),
 ].filter(Boolean);
+
+if (toggle && nav) {
+  toggle.addEventListener('click', () => {
+    const isOpen = nav.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', String(isOpen));
+  });
+
+  nav.querySelectorAll('a').forEach((link) => {
+    link.addEventListener('click', () => {
+      if (!nav.classList.contains('open')) return;
+      nav.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+    });
+  });
+}
 
 const setAccountStatus = (text, tone = 'neutral') => {
   accountStatusBadge.textContent = text;
@@ -55,7 +71,6 @@ const loadAccount = async () => {
     const user = sessionData.user;
     accountName.textContent = user.fullName || 'Lumina Scan member';
     accountEmail.textContent = user.email || 'Unknown email';
-    accountUserId.textContent = user.userId || 'Unavailable';
     accountAvatar.textContent = deriveInitials(user.fullName, user.email);
     setAccountStatus('Signed in', 'success');
 

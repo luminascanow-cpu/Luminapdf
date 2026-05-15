@@ -292,7 +292,7 @@ const renderAuthResultPage = ({ title, message, success, actionHref, actionLabel
     <main class="shell auth-page">
       <section class="auth-grid" style="grid-template-columns: 1fr; max-width: 840px; margin: 0 auto;">
         <article class="auth-form-card" style="padding: 34px;">
-          <div class="eyebrow">${success ? 'Supabase Connected' : 'Authentication Error'}</div>
+          <div class="eyebrow">${success ? 'Website Connected' : 'Authentication Error'}</div>
           <h1 style="margin: 18px 0 12px;">${escapeHtml(title)}</h1>
           <p style="margin: 0 0 18px; color: var(--muted); line-height: 1.8;">
             ${success ? 'Your website authentication request completed successfully.' : 'The website could not complete that sign-in request. You can go back and try again right away.'}
@@ -316,7 +316,7 @@ const requestSupabaseAuth = async (pathname, payload) => {
   const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase credentials are missing on the local website server.');
+    throw new Error('Authentication credentials are missing on the website server.');
   }
 
   const response = await fetch(`${supabaseUrl}${pathname}`, {
@@ -331,7 +331,7 @@ const requestSupabaseAuth = async (pathname, payload) => {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data?.msg || data?.error_description || data?.error || 'Supabase authentication failed.');
+    throw new Error(data?.msg || data?.error_description || data?.error || 'Authentication failed.');
   }
 
   return data;
@@ -342,7 +342,7 @@ const requestSupabaseJson = async (pathname, payload) => {
   const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase credentials are missing on the local website server.');
+    throw new Error('Authentication credentials are missing on the website server.');
   }
 
   const controller = new AbortController();
@@ -362,16 +362,16 @@ const requestSupabaseJson = async (pathname, payload) => {
     });
   } catch (error) {
     if (error.name === 'AbortError') {
-      throw new Error('Password reset timed out while contacting Supabase. Please try again.');
+      throw new Error('Password reset timed out. Please try again.');
     }
-    throw new Error('Could not reach Supabase for password reset. Please try again.');
+    throw new Error('Could not complete the password reset request. Please try again.');
   } finally {
     clearTimeout(timeout);
   }
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data?.msg || data?.error_description || data?.error || 'Supabase request failed.');
+    throw new Error(data?.msg || data?.error_description || data?.error || 'Authentication request failed.');
   }
 
   return data;

@@ -342,12 +342,12 @@ const handleSubmit = async (event) => {
 const initAuth = async () => {
   if (!config.supabaseUrl || !config.supabaseAnonKey) {
     configWarning.hidden = false;
-    showMessage('Supabase config is missing on the website.', 'error');
+    showMessage('Website authentication config is missing.', 'error');
     return;
   }
 
   if (!window.supabase?.createClient) {
-    showMessage('Supabase browser library did not load. Check your internet connection and refresh.', 'error');
+    showMessage('Website authentication could not load. Check your internet connection and refresh.', 'error');
     return;
   }
 

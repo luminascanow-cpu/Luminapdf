@@ -15,7 +15,7 @@
   <body class="editor-body editor-standalone">
     <header class="site-header editor-header">
       <div class="shell">
-        <nav class="nav editor-nav">
+        <nav class="nav editor-nav" data-nav>
           <a class="brand" href="./index.html">
             <img class="brand-mark" src="./app-logo.png" alt="Lumina Scan logo" />
             <div class="brand-copy">
@@ -27,10 +27,41 @@
             <strong>PDF Editor</strong>
             <span>Upload, replace, sign, reorder, and export</span>
           </div>
-          <div class="editor-nav-actions">
+          <div class="editor-nav-actions nav-actions">
             <a class="button button-secondary" href="./index.html">Back Home</a>
-            <a class="button button-secondary" href="./login.html">Sign In</a>
+            <a class="button button-secondary" id="nav-sign-in-link" href="./login.html">Sign In</a>
+            <div class="nav-user-container" id="nav-user-container" hidden>
+              <div class="nav-user-menu">
+                <button
+                  class="button button-secondary nav-user-trigger"
+                  id="nav-user-trigger"
+                  type="button"
+                  aria-expanded="false"
+                >
+                  <span id="nav-user-email-display">Account</span>
+                  <span class="nav-user-caret">▾</span>
+                </button>
+                <div class="nav-user-dropdown" id="nav-user-dropdown" hidden>
+                  <div class="nav-user-dropdown-copy">
+                    <strong id="nav-user-dropdown-name">Lumina Scan account</strong>
+                    <span id="nav-user-dropdown-email">Signed in</span>
+                  </div>
+                  <a class="nav-user-dropdown-link" href="./my-account.html">My Account</a>
+                  <a class="nav-user-dropdown-link" href="./index.html">Back Home</a>
+                  <button class="nav-user-dropdown-action" id="nav-sign-out" type="button">Sign Out</button>
+                </div>
+              </div>
+            </div>
           </div>
+          <button
+            class="menu-toggle"
+            data-menu-toggle
+            type="button"
+            aria-label="Open navigation menu"
+            aria-expanded="false"
+          >
+            ☰
+          </button>
         </nav>
       </div>
     </header>
@@ -293,6 +324,7 @@
     <script src="./pdf.min.js"></script>
     <script src="./pdf-lib.min.js"></script>
     <script src="./jszip.min.js"></script>
+    <script src="./script.js"></script>
     <script src="./pdf-editor.js"></script>
   </body>
   </html>

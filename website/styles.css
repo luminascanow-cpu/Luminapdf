@@ -520,6 +520,129 @@ a {
   text-shadow: 0 1px 0 rgba(12, 16, 44, 0.16);
 }
 
+.dropzone-card {
+  display: grid;
+  gap: 22px;
+  padding: 42px 38px;
+  min-height: 540px;
+}
+
+.hero-panel-eyebrow {
+  justify-self: center;
+  background: rgba(255, 255, 255, 0.18);
+  color: #eef0ff;
+}
+
+.dropzone-card h3 {
+  margin: 0;
+  text-align: center;
+  font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  font-size: clamp(2.6rem, 4.8vw, 5rem);
+  line-height: 0.95;
+  letter-spacing: -0.06em;
+  color: #fff;
+}
+
+.dropzone-card p {
+  margin: 0 auto;
+  max-width: 720px;
+  text-align: center;
+  color: rgba(239, 242, 255, 0.84);
+  font-size: 1.18rem;
+  line-height: 1.8;
+}
+
+.hero-dropzone {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 28px;
+  align-items: center;
+  justify-items: center;
+  min-height: 290px;
+  padding: 34px 28px;
+  border-radius: 32px;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.08)),
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.12), transparent 52%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.hero-dropzone:hover,
+.hero-dropzone:focus-visible,
+.hero-dropzone.is-dragover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.44);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.1)),
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.18), transparent 58%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 24px 44px rgba(11, 17, 48, 0.24);
+}
+
+.hero-dropzone:focus-visible {
+  outline: none;
+}
+
+.hero-dropzone-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.hero-dropzone-button {
+  min-width: 190px;
+}
+
+.hero-dropzone-copy {
+  color: rgba(239, 242, 255, 0.84);
+  font-size: 1rem;
+}
+
+.hero-dropzone-status {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  text-align: center;
+}
+
+.hero-dropzone-status strong {
+  color: #fff;
+  font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  font-size: 1.1rem;
+}
+
+.hero-dropzone-status span {
+  color: rgba(239, 242, 255, 0.78);
+  font-size: 0.95rem;
+}
+
+.hero-dropzone-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.hero-dropzone-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-weight: 700;
+}
+
 .section {
   padding: 36px 0 72px;
 }
@@ -2975,10 +3098,17 @@ a {
     min-height: auto;
   }
 
-  .floating-stack {
-    position: static;
-    margin-top: 18px;
-    width: 100%;
+  .dropzone-card {
+    padding: 28px 24px;
+    min-height: 460px;
+  }
+
+  .dropzone-card h3 {
+    font-size: clamp(2.4rem, 12vw, 4rem);
+  }
+
+  .dropzone-card p {
+    font-size: 1rem;
   }
 
   .hero-stats,

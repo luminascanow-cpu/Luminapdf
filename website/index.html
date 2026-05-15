@@ -47,23 +47,45 @@
           <div class="nav-links">
             <a href="./index.html">Home</a>
             <a href="./pdf-editor.html">PDF Editor</a>
-            <a href="./privacy.html">Privacy</a>
-            <a href="./terms.html">Terms</a>
           </div>
 
           <div class="nav-actions">
-            <a class="button button-secondary" href="./pdf-editor.html">Open PDF Editor</a>
+            <a class="button button-secondary" href="#play-store-placeholder">Download App</a>
             <a class="button button-primary" id="nav-sign-in-link" href="./login.html">Sign In</a>
 
             <div class="nav-user-container" id="nav-user-container" hidden>
               <div class="nav-user-menu">
-                <button class="button button-secondary nav-user-trigger" type="button">
+                <button
+                  class="button button-secondary nav-user-trigger"
+                  id="nav-user-trigger"
+                  type="button"
+                  aria-expanded="false"
+                >
                   <span id="nav-user-email-display">Account</span>
                   <span class="nav-user-caret">▾</span>
                 </button>
+                <div class="nav-user-dropdown" id="nav-user-dropdown" hidden>
+                  <div class="nav-user-dropdown-copy">
+                    <strong id="nav-user-dropdown-name">Lumina Scan account</strong>
+                    <span id="nav-user-dropdown-email">Signed in</span>
+                  </div>
+                  <a class="nav-user-dropdown-link" href="./my-account.html">My Account</a>
+                  <a class="nav-user-dropdown-link" href="./pdf-editor.html">Open PDF Editor</a>
+                  <button class="nav-user-dropdown-action" id="nav-sign-out" type="button">Sign Out</button>
+                </div>
               </div>
             </div>
           </div>
+
+          <button
+            class="menu-toggle"
+            data-menu-toggle
+            type="button"
+            aria-label="Open navigation menu"
+            aria-expanded="false"
+          >
+            ☰
+          </button>
         </nav>
       </div>
     </header>
@@ -76,7 +98,7 @@
             <h1>Edit PDFs on the web with the same <span>Lumina Scan</span> account.</h1>
             <p>
               Upload documents, fix OCR text, place signatures, and export polished PDFs from the
-              browser while staying connected to the same Supabase-backed account used in the APK.
+              browser while staying connected to the same account used in the app.
             </p>
             <div class="hero-actions">
               <a class="button button-primary" href="./login.html">Sign In</a>
@@ -99,33 +121,30 @@
           </div>
 
           <div class="hero-panel">
-            <div class="panel-card preview-card">
-              <div class="preview-toolbar">
-                <span class="pill brand">Edit</span>
-                <span class="pill soft">Enhance</span>
-                <span class="pill soft">Sign</span>
-                <span class="pill soft">Export</span>
-              </div>
-              <div class="preview-page">
-                <div class="scan-line"></div>
-                <div class="scan-line"></div>
-                <div class="scan-line short"></div>
-                <div class="page-sheet">
-                  <div class="scan-line"></div>
-                  <div class="scan-line short"></div>
-                  <div class="signature-mark"></div>
-                </div>
-              </div>
-            </div>
+            <div class="panel-card dropzone-card">
+              <div class="eyebrow hero-panel-eyebrow">Lumina Scan Studio</div>
+              <h3>Drag and drop Files to edit in the page.</h3>
+              <p>
+                Open a PDF directly into the editor, review pages, drag over text to replace it,
+                sign, and export a polished final file.
+              </p>
 
-            <div class="floating-stack">
-              <div class="panel-card mini-card">
-                <h4>Account-linked website access</h4>
-                <p>Sign in with the same Lumina Scan email and continue editing from the web.</p>
-              </div>
-              <div class="panel-card mini-card">
-                <h4>Dedicated password recovery</h4>
-                <p>Recovery links now forward users into the reset-password screen on the site.</p>
+              <div class="hero-dropzone" id="website-pdf-dropzone" tabindex="0" role="button" aria-label="Drag and drop PDF files here or choose a PDF">
+                <input id="website-pdf-upload" type="file" accept="application/pdf,.pdf" hidden />
+                <div class="hero-dropzone-center">
+                  <button class="button button-primary hero-dropzone-button" id="website-pdf-choose" type="button">Choose PDF</button>
+                  <span class="hero-dropzone-copy">Tap anywhere here to open the PDF editor, or drop a PDF inside this canvas</span>
+                </div>
+                <div class="hero-dropzone-status" id="website-pdf-state" hidden>
+                  <strong id="website-pdf-name">No file selected</strong>
+                  <span id="website-pdf-hint">Preparing your document for the editor...</span>
+                </div>
+                <div class="hero-dropzone-chips">
+                  <span class="hero-dropzone-chip">Drag to replace</span>
+                  <span class="hero-dropzone-chip">Drag-to-edit</span>
+                  <span class="hero-dropzone-chip">Signature ready</span>
+                  <span class="hero-dropzone-chip">Instant export</span>
+                </div>
               </div>
             </div>
           </div>
@@ -153,8 +172,8 @@
               <p>Login, forgot-password, and reset-password each have their own route and user flow.</p>
             </article>
             <article class="feature-card">
-              <h3>Shared Supabase backend</h3>
-              <p>The website and APK app continue using the same Supabase project and account system.</p>
+              <h3>Shared account access</h3>
+              <p>The website and app continue using the same account system so one email works across both.</p>
             </article>
           </div>
         </div>
