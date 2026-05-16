@@ -27,7 +27,7 @@ try {
 const port = Number(process.env.PORT || 4173);
 const pythonExec =
   process.env.LUMINA_PYTHON ||
-  '/Users/dipanudas/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3';
+  'python3';
 const pdfSelectionScript = path.join(root, 'pdf_selection.py');
 const pdfSessions = new Map();
 const authSessions = new Map();
@@ -435,6 +435,19 @@ const server = http.createServer((req, res) => {
     Expires: '0',
     'Surrogate-Control': 'no-store',
   };
+
+  if (req.method === 'GET' && cleanUrl === '/healthz') {
+    sendJson(
+      res,
+      200,
+      {
+        ok: true,
+        service: 'lumina-scan-website',
+      },
+      noCacheHeaders
+    );
+    return;
+  }
 
   if (cleanUrl === '/app-config.js') {
     const config = {
