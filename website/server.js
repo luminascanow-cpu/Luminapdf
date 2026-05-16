@@ -476,6 +476,30 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && cleanUrl.startsWith('/api/pdf-session/')) {
+    const sessionId = cleanUrl.slice('/api/pdf-session/'.length);
+    const session = pdfSessions.get(sessionId);
+
+    if (!session) {
+      sendJson(res, 404, { error: 'PDF session not found.' }, noCacheHeaders);
+      return;
+    }
+
+    try {
+      const bytes = fs.readFileSync(session.path);
+      res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Length': bytes.length,
+        'X-Lumina-File-Name': encodeURIComponent(session.fileName || 'document.pdf'),
+        ...noCacheHeaders,
+      });
+      res.end(bytes);
+    } catch (error) {
+      sendJson(res, 500, { error: error.message || 'Could not read PDF session.' }, noCacheHeaders);
+    }
+    return;
+  }
+
   if (req.method === 'POST' && cleanUrl === '/api/pdf-selection') {
     readJsonBody(req)
       .then(async (body) => {

@@ -1,18 +1,22 @@
-const pdfLibApi = window.PDFLib || null;
-const PDFDocument = pdfLibApi?.PDFDocument || null;
-const rgb = pdfLibApi?.rgb || null;
-const StandardFonts = pdfLibApi?.StandardFonts || null;
-const pdfJsApi = window.pdfjsLib || null;
+const getPdfJs = () => window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+const getPdfLib = () => window.PDFLib;
+
+let PDFDocument, rgb, StandardFonts;
+
 const editorUrlParams = new URLSearchParams(window.location.search);
+const EDITOR_SESSION_QUERY_PARAM = 'session';
 
 if (editorUrlParams.get('embed') === '1') {
-  document.body.classList.add('embed-mode');
+  document.documentElement.classList.add('is-embedded');
 }
 
-if (pdfJsApi) {
-  // Use local worker file (version 3.11.174 UMD build, served alongside this page)
-  pdfJsApi.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
-}
+// Global worker setup (lazy)
+const setupPdfWorker = () => {
+  const api = getPdfJs();
+  if (api && !api.GlobalWorkerOptions.workerSrc) {
+    api.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
+  }
+};
 
 const DOC_COLORS = [
   '#4647d3', '#e05a2b', '#10a37f', '#d32b6b', '#7c3aed',
@@ -71,6 +75,8 @@ const state = {
 const elements = {
   upload: document.getElementById('editor-pdf-upload'),
   uploadMirrors: Array.from(document.querySelectorAll('.file-trigger-input')),
+  uploadTrigger: document.getElementById('editor-upload-trigger'),
+  emptyUploadTrigger: document.getElementById('editor-empty-upload-trigger'),
   fileState: document.getElementById('editor-file-state'),
   fileName: document.getElementById('editor-file-name'),
   imageUpload: document.getElementById('editor-image-upload'),
@@ -273,12 +279,12 @@ elements.textColor?.addEventListener('input', () => {
 const signatureContext = elements.signatureCanvas.getContext('2d');
 let signatureDrawing = false;
 let signatureHasPath = false;
-const WEBSITE_EDITOR_PDF_KEY = 'luminaWebsiteEditorPdf';
+const EDITOR_STORAGE_PDF_KEY = 'luminaWebsiteEditorPdf';
 let editorPdfObjectUrl = null;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-const hasPdfLib = () => !!(PDFDocument && rgb && StandardFonts);
-const hasPdfJs = () => !!pdfJsApi;
+const hasPdfLib = () => !!getPdfLib()?.PDFDocument;
+const hasPdfJs = () => !!getPdfJs();
 
 const setTextFontPreset = (preset) => {
   state.textFontPreset = FONT_PRESETS[preset] ? preset : 'sans';
@@ -634,7 +640,7 @@ const updateButtons = () => {
   elements.toggleEditModeButton.disabled = !hasPdf;
 };
 
-elements.toggleEditModeButton.addEventListener('click', () => {
+elements.toggleEditModeButton?.addEventListener('click', () => {
   state.focusMode = !state.focusMode;
   
   if (state.focusMode) {
@@ -694,6 +700,34 @@ const uint8ArrayToBase64 = (bytes) => {
     binary += String.fromCharCode(...chunk);
   }
   return btoa(binary);
+};
+
+const readFileAsUint8Array = async (file) => {
+  if (!file) {
+    throw new Error('No file was selected.');
+  }
+
+  if (typeof file.arrayBuffer === 'function') {
+    try {
+      return new Uint8Array(await file.arrayBuffer());
+    } catch (error) {
+      console.warn('[Upload] file.arrayBuffer() failed, falling back to FileReader:', error);
+    }
+  }
+
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (!(result instanceof ArrayBuffer)) {
+        reject(new Error('Could not read the selected PDF file.'));
+        return;
+      }
+      resolve(new Uint8Array(result));
+    };
+    reader.onerror = () => reject(reader.error || new Error('Could not read the selected PDF file.'));
+    reader.readAsArrayBuffer(file);
+  });
 };
 
 const registerPdfSession = async (bytes, fileName) => {
@@ -1067,6 +1101,7 @@ const renderTextHitLayer = async (page, displaySize, sourcePageIndex) => {
 
 
 const renderWorkspace = async () => {
+  console.log('Lumina Scan: renderWorkspace triggered. Page count:', state.pageOrder.length, 'Source bytes:', !!state.sourceBytes);
   if (!state.sourceBytes || state.pageOrder.length === 0) {
     setEmptyState(true);
     elements.textHitLayer.innerHTML = '';
@@ -1170,22 +1205,40 @@ const renderWorkspace = async () => {
   });
 };
 
-const loadPdfBytes = async (bytes, fileName, appendMetadata) => {
-  state.sourceBytes = bytes;
-  state.pdfSessionId = null;
-  state.pageSizes = [];
-  state.pageTextCache = {}; // Reset cache for new doc
-  updateStatus('Loading PDF...', 'Preparing your document for the browser editor.');
-  await registerPdfSession(bytes, fileName);
+const loadPdfBytes = async (bytes, fileName, appendMetadata = null, options = {}) => {
+  const pdfJsApi = getPdfJs();
+  const PDFLib = getPdfLib();
+  
+  console.log('Lumina Scan: loadPdfBytes started for:', fileName, 'Bytes length:', bytes ? bytes.length : 0);
+  
+  if (!bytes || bytes.length === 0) {
+    console.error('Lumina Scan: No bytes provided to loadPdfBytes');
+    return;
+  }
 
-  if (hasPdfLib()) {
+  state.pdfJsDoc = null;
+  state.sourceBytes = bytes;
+  state.pageSizes = [];
+  state.pageOrder = [];
+  state.pageTextCache = {};
+  
+  updateStatus('Loading PDF...', 'Preparing your document for the browser editor.');
+  setupPdfWorker();
+  if (!options.skipSessionRegistration) {
+    void registerPdfSession(bytes, fileName);
+  }
+
+  if (PDFLib && PDFLib.PDFDocument) {
     try {
-      const inspectDoc = await PDFDocument.load(bytes);
+      console.log('Lumina Scan: Loading with PDF-Lib for page metrics...');
+      const inspectDoc = await PDFLib.PDFDocument.load(bytes);
+      console.log('Lumina Scan: PDF-Lib load success, pages:', inspectDoc.getPageCount());
       state.pageSizes = inspectDoc.getPages().map((page) => ({
         width: page.getWidth(),
         height: page.getHeight(),
       }));
     } catch (error) {
+      console.error('Lumina Scan: PDF-Lib load failed:', error);
       state.pageSizes = [];
     }
   }
@@ -1195,11 +1248,16 @@ const loadPdfBytes = async (bytes, fileName, appendMetadata) => {
       throw new Error('PDF canvas renderer is unavailable.');
     }
     // Use disableWorker:true — most reliable for static/local serving (no CORS, no CDN fetch)
+    if (!pdfJsApi) {
+      throw new Error('PDF.js library is not loaded. Cannot render document.');
+    }
     const dataCopy = new Uint8Array(bytes); // copy to prevent ArrayBuffer detachment
+    console.log('Lumina Scan: Initializing PDF.js document loading...');
     state.pdfJsDoc = await pdfJsApi.getDocument({
       data: dataCopy,
       disableWorker: true,
     }).promise;
+    console.log('Lumina Scan: PDF.js document loaded successfully.');
   } catch (error) {
     console.warn('[PDF.js] Canvas renderer failed:', error);
     state.pdfJsDoc = null;
@@ -1240,9 +1298,12 @@ const loadPdfBytes = async (bytes, fileName, appendMetadata) => {
   state.fileName = (fileName || 'edited-document').replace(/\.pdf$/i, '') + '-edited.pdf';
   elements.fileName.textContent = fileName || 'Uploaded PDF';
   elements.fileState.hidden = false;
+  console.log('Lumina Scan: Finalizing document state...');
   setMode('view');
   updateButtons();
+  console.log('Lumina Scan: Calling renderWorkspace...');
   await renderWorkspace();
+  console.log('Lumina Scan: Calling renderThumbnails...');
   renderThumbnails();
   
   // Start background scan
@@ -1815,7 +1876,7 @@ const replaceWordAtPoint = async (point) => {
   return true;
 };
 
-elements.pageStage.addEventListener('contextmenu', (event) => {
+elements.pageStage?.addEventListener('contextmenu', (event) => {
   event.preventDefault();
   hideContextMenu();
 });
@@ -1824,7 +1885,7 @@ elements.pageStageCard?.addEventListener('scroll', () => {
   hideContextMenu();
 });
 
-elements.pageStage.addEventListener('click', async (event) => {
+elements.pageStage?.addEventListener('click', async (event) => {
   if (!state.sourceBytes || state.pageOrder.length === 0) return;
   hideContextMenu();
   if (event.target.closest('.overlay-item')) return;
@@ -1857,7 +1918,7 @@ elements.pageStage.addEventListener('click', async (event) => {
   }
 });
 
-elements.pageStage.addEventListener('pointerdown', (event) => {
+elements.pageStage?.addEventListener('pointerdown', (event) => {
   if (state.mode === 'view' && state.sourceBytes && !event.target.closest('.overlay-item')) {
     event.preventDefault();
     hideContextMenu();
@@ -1882,7 +1943,7 @@ elements.pageStage.addEventListener('pointerdown', (event) => {
   }
 });
 
-elements.pageStage.addEventListener('pointermove', (event) => {
+elements.pageStage?.addEventListener('pointermove', (event) => {
   if (state.selectionDraft && state.mode === 'view') {
     const current = stagePointToRelative(event.clientX, event.clientY);
     const x = Math.min(state.selectionDraft.startX, current.x);
@@ -2030,12 +2091,18 @@ window.addEventListener('keydown', (event) => {
 });
 
 const handleUploadInputChange = async (event) => {
-  const input = event.target;
-  const file = input.files && input.files[0];
+  const file = event.target.files && event.target.files[0];
+  console.log('[Editor] File input changed:', file ? file.name : 'No file');
   if (!file) return;
+  
+  try {
+    await handlePdfFile(file);
+  } catch (err) {
+    console.error('[Editor] Error handling PDF file:', err);
+    updateStatus('Error', 'Failed to load the selected PDF. Please try again.');
+  }
 
-  await handlePdfFile(file);
-  input.value = '';
+  // Clear all mirrors so the same file can be picked again
   elements.uploadMirrors?.forEach((mirror) => {
     mirror.value = '';
   });
@@ -2045,10 +2112,41 @@ elements.uploadMirrors?.forEach((input) => {
   input.addEventListener('change', handleUploadInputChange);
 });
 
+let lastPdfPickerOpenAt = 0;
+const openPrimaryPdfPicker = (event) => {
+  const now = Date.now();
+  if (now - lastPdfPickerOpenAt < 350) return;
+  lastPdfPickerOpenAt = now;
+
+  // If the event is already targeting a file input, let it happen naturally
+  if (event?.target?.tagName === 'INPUT' && event.target.type === 'file') {
+    return;
+  }
+
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+
+  if (elements.upload) {
+    console.log('[Editor] Manually triggering sidebar PDF picker');
+    elements.upload.click();
+  } else if (elements.uploadMirrors && elements.uploadMirrors.length > 0) {
+    console.log('[Editor] Manually triggering first available PDF picker');
+    elements.uploadMirrors[0].click();
+  }
+};
+
+[elements.uploadTrigger, elements.emptyUploadTrigger].forEach((trigger) => {
+  if (!trigger) return;
+  ['click', 'pointerup', 'touchend'].forEach((eventName) => {
+    trigger.addEventListener(eventName, openPrimaryPdfPicker);
+  });
+});
+
 const handlePdfFile = async (file) => {
   let bytes = null;
   try {
-    bytes = new Uint8Array(await file.arrayBuffer());
+    updateStatus('Opening PDF...', 'Reading the selected file from your device.');
+    bytes = await readFileAsUint8Array(file);
     await loadPdfBytes(bytes, file.name);
   } catch (error) {
     console.error('[Upload] PDF load failed, using fallback preview:', error);
@@ -2081,7 +2179,7 @@ const handlePdfFile = async (file) => {
 };
 
 ['dragenter', 'dragover'].forEach((eventName) => {
-  elements.pageStageCard.addEventListener(eventName, (event) => {
+  elements.pageStageCard?.addEventListener(eventName, (event) => {
     event.preventDefault();
     if (!event.dataTransfer?.types?.includes('Files')) return;
     setEmptyState(!state.sourceBytes, true);
@@ -2089,14 +2187,14 @@ const handlePdfFile = async (file) => {
 });
 
 ['dragleave', 'dragend'].forEach((eventName) => {
-  elements.pageStageCard.addEventListener(eventName, (event) => {
+  elements.pageStageCard?.addEventListener(eventName, (event) => {
     event.preventDefault();
     if (eventName === 'dragleave' && elements.pageStageCard.contains(event.relatedTarget)) return;
     setEmptyState(!state.sourceBytes, false);
   });
 });
 
-elements.pageStageCard.addEventListener('drop', async (event) => {
+elements.pageStageCard?.addEventListener('drop', async (event) => {
   event.preventDefault();
   setEmptyState(!state.sourceBytes, false);
   const file = Array.from(event.dataTransfer?.files || []).find((item) => item.type === 'application/pdf' || item.name?.toLowerCase().endsWith('.pdf'));
@@ -2107,13 +2205,13 @@ elements.pageStageCard.addEventListener('drop', async (event) => {
   await handlePdfFile(file);
 });
 
-elements.placeWhiteoutButton.addEventListener('click', () => {
+elements.placeWhiteoutButton?.addEventListener('click', () => {
   if (!state.sourceBytes || state.pageOrder.length === 0) return;
   setMode('place-whiteout');
   toggleDropdown();
 });
 
-elements.imageUpload.addEventListener('change', async (event) => {
+elements.imageUpload?.addEventListener('change', async (event) => {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
   state.imageDataUrl = await new Promise((resolve, reject) => {
@@ -2157,26 +2255,26 @@ const updateActiveSignature = (dataUrl) => {
   updateButtons();
 };
 
-elements.placeImageButton.addEventListener('click', () => {
+elements.placeImageButton?.addEventListener('click', () => {
   if (!state.sourceBytes || state.pageOrder.length === 0 || !state.imageDataUrl) return;
   setMode('place-image');
   toggleDropdown();
 });
 
-elements.openSignatureModalButton.addEventListener('click', () => {
+elements.openSignatureModalButton?.addEventListener('click', () => {
   elements.signatureModal.hidden = false;
   toggleDropdown();
 });
 
-elements.placeSignatureButton.addEventListener('click', () => {
+elements.placeSignatureButton?.addEventListener('click', () => {
   if (!state.signatureDataUrl || !state.sourceBytes || state.pageOrder.length === 0) return;
   setMode('place-signature');
   toggleDropdown();
 });
 
-elements.toolWhiteoutDropdown.addEventListener('click', () => toggleDropdown('dropdown-whiteout'));
-elements.toolImageDropdown.addEventListener('click', () => toggleDropdown('dropdown-image'));
-elements.toolSignatureDropdown.addEventListener('click', () => toggleDropdown('dropdown-signature'));
+elements.toolWhiteoutDropdown?.addEventListener('click', () => toggleDropdown('dropdown-whiteout'));
+elements.toolImageDropdown?.addEventListener('click', () => toggleDropdown('dropdown-image'));
+elements.toolSignatureDropdown?.addEventListener('click', () => toggleDropdown('dropdown-signature'));
 
 elements.contextAddWhiteout?.addEventListener('click', () => {
   const point = state.contextPoint;
@@ -2216,41 +2314,41 @@ elements.contextPan?.addEventListener('click', () => {
   hideContextMenu();
 });
 
-elements.prevPageButton.addEventListener('click', () => {
+elements.prevPageButton?.addEventListener('click', () => {
   if (state.selectedPageIndex > 0) {
     state.selectedPageIndex -= 1;
     void renderWorkspace(true);
     renderThumbnails();
   }
 });
-elements.nextPageButton.addEventListener('click', () => {
+elements.nextPageButton?.addEventListener('click', () => {
   if (state.selectedPageIndex < state.pageOrder.length - 1) {
     state.selectedPageIndex += 1;
     void renderWorkspace(true);
     renderThumbnails();
   }
 });
-elements.movePageUpButton.addEventListener('click', () => swapPages(-1));
-elements.movePageDownButton.addEventListener('click', () => swapPages(1));
-elements.deletePageButton.addEventListener('click', () => deleteCurrentPage());
+elements.movePageUpButton?.addEventListener('click', () => swapPages(-1));
+elements.movePageDownButton?.addEventListener('click', () => swapPages(1));
+elements.deletePageButton?.addEventListener('click', () => deleteCurrentPage());
 
-elements.zoomInButton.addEventListener('click', () => {
+elements.zoomInButton?.addEventListener('click', () => {
   state.zoomLevel = Math.min(state.zoomLevel + 0.2, 4.0);
   void renderWorkspace();
 });
-elements.zoomOutButton.addEventListener('click', () => {
+elements.zoomOutButton?.addEventListener('click', () => {
   state.zoomLevel = Math.max(state.zoomLevel - 0.2, 0.2);
   void renderWorkspace();
 });
-elements.zoomFitButton.addEventListener('click', () => {
+elements.zoomFitButton?.addEventListener('click', () => {
   state.zoomLevel = 1.0;
   void renderWorkspace();
 });
-elements.toolPanButton.addEventListener('click', () => {
+elements.toolPanButton?.addEventListener('click', () => {
   setMode('pan');
 });
 
-elements.mergePdfInput.addEventListener('change', async (event) => {
+elements.mergePdfInput?.addEventListener('change', async (event) => {
   const files = event.target.files;
   if (!files || files.length === 0) return;
   if (!state.sourceBytes) {
@@ -2304,6 +2402,7 @@ elements.mergePdfInput.addEventListener('change', async (event) => {
     // Rebuild pdfJsDoc from the merged bytes to get correct page count
     let newPdfJsDoc = null;
     try {
+      const pdfJsApi = getPdfJs();
       newPdfJsDoc = await pdfJsApi.getDocument({ data: savedBytes, disableWorker: true }).promise;
     } catch (e) { /* ignore */ }
 
@@ -2325,7 +2424,7 @@ elements.mergePdfInput.addEventListener('change', async (event) => {
   event.target.value = '';
 });
 
-elements.splitPdfBtn.addEventListener('click', async () => {
+elements.splitPdfBtn?.addEventListener('click', async () => {
   if (!state.sourceBytes || state.pageOrder.length === 0 || !hasPdfLib() || typeof JSZip === 'undefined') return;
   
   updateStatus('Splitting PDF...', 'Creating a ZIP file with individual pages.');
@@ -2352,7 +2451,7 @@ elements.splitPdfBtn.addEventListener('click', async () => {
   }
 });
 
-elements.extractTextButton.addEventListener('click', async () => {
+elements.extractTextButton?.addEventListener('click', async () => {
   if (!state.sourceBytes || state.pageOrder.length === 0 || !state.pdfJsDoc) return;
   if (typeof window.Tesseract === 'undefined') {
     window.alert('OCR library (Tesseract.js) failed to load. Please check your internet connection.');
@@ -2383,7 +2482,7 @@ elements.extractTextButton.addEventListener('click', async () => {
   }
 });
 
-elements.extractPageButton.addEventListener('click', async () => {
+elements.extractPageButton?.addEventListener('click', async () => {
   if (!state.sourceBytes || state.pageOrder.length === 0 || !hasPdfLib()) return;
   const pdfDoc = await PDFDocument.load(state.sourceBytes);
   const outputDoc = await PDFDocument.create();
@@ -2414,7 +2513,7 @@ document.querySelectorAll('[data-close-ocr]').forEach((node) => {
   node.addEventListener('click', closeOcrModal);
 });
 
-elements.copyOcrTextButton.addEventListener('click', () => {
+elements.copyOcrTextButton?.addEventListener('click', () => {
   navigator.clipboard.writeText(elements.ocrResultText.value).then(() => {
     const originalText = elements.copyOcrTextButton.textContent;
     elements.copyOcrTextButton.textContent = "Copied!";
@@ -2441,7 +2540,7 @@ const signaturePoint = (event) => {
   };
 };
 
-elements.signatureCanvas.addEventListener('pointerdown', (event) => {
+elements.signatureCanvas?.addEventListener('pointerdown', (event) => {
   signatureDrawing = true;
   signatureHasPath = true;
   const point = signaturePoint(event);
@@ -2449,7 +2548,7 @@ elements.signatureCanvas.addEventListener('pointerdown', (event) => {
   signatureContext.moveTo(point.x, point.y);
 });
 
-elements.signatureCanvas.addEventListener('pointermove', (event) => {
+elements.signatureCanvas?.addEventListener('pointermove', (event) => {
   if (!signatureDrawing) return;
   const point = signaturePoint(event);
   signatureContext.lineTo(point.x, point.y);
@@ -2460,12 +2559,12 @@ window.addEventListener('pointerup', () => {
   signatureDrawing = false;
 });
 
-elements.clearSignatureButton.addEventListener('click', () => {
+elements.clearSignatureButton?.addEventListener('click', () => {
   signatureHasPath = false;
   resetSignatureCanvas();
 });
 
-elements.saveSignatureButton.addEventListener('click', () => {
+elements.saveSignatureButton?.addEventListener('click', () => {
   if (!signatureHasPath) {
     window.alert('Draw a signature first.');
     return;
@@ -2648,7 +2747,7 @@ const exportPdfContent = async () => {
 
 // checkLifetimeAccess removed for now
 
-elements.downloadButton.addEventListener('click', async () => {
+elements.downloadButton?.addEventListener('click', async () => {
   if (!state.sourceBytes || !hasPdfLib()) return;
   // Payment disabled for now - export directly
   await exportPdfContent();
@@ -2660,7 +2759,7 @@ elements.downloadButton.addEventListener('click', async () => {
 
 // Signature Upload Handler
 if (elements.signatureUploadInput) {
-  elements.signatureUploadInput.addEventListener('change', (e) => {
+  elements.signatureUploadInput?.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
@@ -2682,9 +2781,89 @@ if (elements.signatureUploadInput) {
   });
 }
 
-resetSignatureCanvas();
-updateButtons();
-sessionStorage.removeItem(WEBSITE_EDITOR_PDF_KEY);
+const loadWebsitePdfFromSession = async () => {
+  const stored = sessionStorage.getItem(EDITOR_STORAGE_PDF_KEY);
+  console.log('Lumina Scan: Checking session storage for PDF data...', stored ? 'Found' : 'Not found');
+  if (!stored) return;
+
+  try {
+    const { name, bytesBase64 } = JSON.parse(stored);
+    if (bytesBase64) {
+      updateStatus('Opening document...', 'Loading the PDF you selected from the homepage.');
+      const bytes = base64ToUint8Array(bytesBase64);
+      await loadPdfBytes(bytes, name);
+      console.log('Lumina Scan: Session PDF loaded successfully, clearing storage.');
+      sessionStorage.removeItem(EDITOR_STORAGE_PDF_KEY);
+    }
+  } catch (error) {
+    console.error('[Session] Failed to load PDF from session storage:', error);
+  }
+};
+
+const loadWebsitePdfFromServerSession = async () => {
+  const sessionId = editorUrlParams.get(EDITOR_SESSION_QUERY_PARAM);
+  if (!sessionId) return false;
+
+  try {
+    updateStatus('Opening document...', 'Loading the PDF you selected from the homepage.');
+    const response = await fetch(`./api/pdf-session/${encodeURIComponent(sessionId)}`, {
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('The homepage PDF session could not be found.');
+    }
+
+    const fileNameHeader = response.headers.get('X-Lumina-File-Name') || '';
+    const fileName = decodeURIComponent(fileNameHeader || 'document.pdf');
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    state.pdfSessionId = sessionId;
+    await loadPdfBytes(bytes, fileName, null, { skipSessionRegistration: true });
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete(EDITOR_SESSION_QUERY_PARAM);
+    window.history.replaceState({}, '', nextUrl.pathname + nextUrl.search + nextUrl.hash);
+    return true;
+  } catch (error) {
+    console.error('[Session] Failed to load PDF from server session:', error);
+    return false;
+  }
+};
+
+const initializeEditor = () => {
+  console.log('Lumina Scan: Initializing editor components...');
+  
+  const lib = getPdfLib();
+  if (lib) {
+    PDFDocument = lib.PDFDocument;
+    rgb = lib.rgb;
+    StandardFonts = lib.StandardFonts;
+  }
+
+  resetSignatureCanvas();
+  updateButtons();
+  
+  // Re-collect mirrors in case DOM changed
+  elements.uploadMirrors = Array.from(document.querySelectorAll('.file-trigger-input'));
+  elements.uploadMirrors.forEach((input) => {
+    input.addEventListener('change', handleUploadInputChange);
+  });
+
+  void (async () => {
+    const loadedFromServerSession = await loadWebsitePdfFromServerSession();
+    if (!loadedFromServerSession) {
+      await loadWebsitePdfFromSession();
+    }
+  })();
+};
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', initializeEditor);
+} else {
+  initializeEditor();
+}
 
 // Handle window resize for responsiveness
 let resizeTimeout;
@@ -2700,7 +2879,7 @@ window.addEventListener('resize', () => {
 
 // Auto-paging on scroll
 let isScrollingToPage = false;
-elements.pageStageCard.addEventListener('scroll', () => {
+elements.pageStageCard?.addEventListener('scroll', () => {
   if (isScrollingToPage || state.pageOrder.length === 0) return;
   
   const { scrollTop, scrollHeight, clientHeight } = elements.pageStageCard;
@@ -2737,7 +2916,7 @@ let railStartPos = { x: 0, y: 0 };
 let railOffset = { x: 0, y: 0 };
 
 if (elements.railDragHandle && elements.leftRail) {
-  elements.railDragHandle.addEventListener('pointerdown', (e) => {
+  elements.railDragHandle?.addEventListener('pointerdown', (e) => {
     isDraggingRail = true;
     railStartPos = { x: e.clientX, y: e.clientY };
     
@@ -2768,7 +2947,7 @@ if (elements.railDragHandle && elements.leftRail) {
     e.preventDefault();
   });
 
-  elements.railDragHandle.addEventListener('pointermove', (e) => {
+  elements.railDragHandle?.addEventListener('pointermove', (e) => {
     if (!isDraggingRail) return;
     
     const dx = e.clientX - railStartPos.x;
@@ -2780,7 +2959,7 @@ if (elements.railDragHandle && elements.leftRail) {
     elements.leftRail.style.transform = `translate(${newX}px, ${newY}px)`;
   });
 
-  elements.railDragHandle.addEventListener('pointerup', () => {
+  elements.railDragHandle?.addEventListener('pointerup', () => {
     if (isDraggingRail) {
       isDraggingRail = false;
       elements.leftRail.style.transition = 'transform 0.1s ease-out';
@@ -2792,7 +2971,7 @@ if (elements.railDragHandle && elements.leftRail) {
 
 // Local Signature Upload Handler
 if (elements.uploadSignatureLocal) {
-  elements.uploadSignatureLocal.addEventListener('change', (e) => {
+  elements.uploadSignatureLocal?.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     

@@ -78,7 +78,7 @@
 
             <div class="vertical-toolbar">
               <div class="toolbar-group">
-                <label class="tool-btn tool-btn-primary file-trigger" title="Upload PDF">
+                <label class="tool-btn tool-btn-primary file-trigger" id="editor-upload-trigger" title="Upload PDF">
                   <input id="editor-pdf-upload" type="file" accept=".pdf,application/pdf" class="file-trigger-input" />
                   <span class="tool-icon">↑</span> Upload
                 </label>
@@ -229,8 +229,8 @@
                     <h2>Drag and drop your document here</h2>
                     <p>Open a PDF directly into the editor, then review pages, drag over text to replace it, sign, and export a polished final file.</p>
                     <div class="editor-empty-actions">
-                      <label class="button button-primary editor-empty-upload file-trigger">
-                        <input type="file" accept=".pdf,application/pdf" class="file-trigger-input file-trigger-input-secondary" />
+                      <label class="button button-primary editor-empty-upload file-trigger" id="editor-empty-upload-trigger">
+                        <input id="editor-pdf-upload-empty" type="file" accept=".pdf,application/pdf" class="file-trigger-input file-trigger-input-secondary" />
                         Choose PDF
                       </label>
                       <span class="editor-empty-hint">or drop a PDF anywhere inside this canvas</span>
@@ -303,12 +303,12 @@
 
 <!-- Payment modal removed for now -->
 
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    <script src="https://unpkg.com/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
     <script src="./pdf.min.js"></script>
     <script src="./pdf-lib.min.js"></script>
     <script src="./jszip.min.js"></script>
     <script src="./script.js"></script>
     <script src="./pdf-editor.js"></script>
+    <script defer src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script defer src="https://unpkg.com/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
   </body>
   </html>

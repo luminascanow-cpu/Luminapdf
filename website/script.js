@@ -120,6 +120,7 @@ const websitePdfState = document.getElementById('website-pdf-state');
 const websitePdfName = document.getElementById('website-pdf-name');
 const websitePdfHint = document.getElementById('website-pdf-hint');
 const WEBSITE_EDITOR_PDF_KEY = 'luminaWebsiteEditorPdf';
+const WEBSITE_EDITOR_SESSION_PARAM = 'session';
 
 const arrayBufferToBase64 = (buffer) => {
   const bytes = new Uint8Array(buffer);
@@ -129,6 +130,37 @@ const arrayBufferToBase64 = (buffer) => {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
   return btoa(binary);
+};
+
+const buildWebsiteEditorUrl = (sessionId = '') => {
+  if (!sessionId) return './pdf-editor.html';
+  return `./pdf-editor.html?${WEBSITE_EDITOR_SESSION_PARAM}=${encodeURIComponent(sessionId)}`;
+};
+
+const createWebsitePdfSession = async (file, arrayBuffer) => {
+  const response = await fetch('./api/pdf-session', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+    body: JSON.stringify({
+      fileName: file.name || 'document.pdf',
+      bytesBase64: arrayBufferToBase64(arrayBuffer),
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload?.error || 'Could not prepare the PDF for the editor.');
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  if (!payload?.sessionId) {
+    throw new Error('The editor session could not be created.');
+  }
+
+  return payload.sessionId;
 };
 
 const handleWebsitePdfFile = async (file) => {
@@ -154,24 +186,40 @@ const handleWebsitePdfFile = async (file) => {
   websitePdfName.textContent = file.name;
   if (websitePdfHint) websitePdfHint.textContent = 'Opening the editor with your document...';
 
-  const arrayBuffer = await file.arrayBuffer();
-  const base64 = arrayBufferToBase64(arrayBuffer);
-  sessionStorage.setItem(
-    WEBSITE_EDITOR_PDF_KEY,
-    JSON.stringify({
-      name: file.name,
-      bytesBase64: base64,
-    })
-  );
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const sessionId = await createWebsitePdfSession(file, arrayBuffer);
+    window.location.href = buildWebsiteEditorUrl(sessionId);
+    return;
+  } catch (error) {
+    console.warn('[Website Upload] Falling back to sessionStorage handoff:', error);
+  }
 
-  window.setTimeout(() => {
-    window.location.href = './pdf-editor.html';
-  }, 180);
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = arrayBufferToBase64(arrayBuffer);
+    sessionStorage.setItem(
+      WEBSITE_EDITOR_PDF_KEY,
+      JSON.stringify({
+        name: file.name,
+        bytesBase64: base64,
+      })
+    );
+    window.setTimeout(() => {
+      window.location.href = './pdf-editor.html';
+    }, 180);
+  } catch (error) {
+    console.error('[Website Upload] Could not prepare the PDF for the editor:', error);
+    websitePdfName.textContent = 'Could not open this PDF';
+    if (websitePdfHint) {
+      websitePdfHint.textContent = 'Try a smaller file or open the PDF Editor and upload there directly.';
+    }
+  }
 };
 
 if (websitePdfUpload && websitePdfDropzone && websitePdfState && websitePdfName) {
   const openWebsitePdfEditor = () => {
-    window.location.href = './pdf-editor.html';
+    window.location.href = buildWebsiteEditorUrl();
   };
 
   websitePdfChoose?.addEventListener('click', (event) => {
