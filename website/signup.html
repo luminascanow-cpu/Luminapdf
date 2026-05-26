@@ -503,8 +503,15 @@
             else strengthBar.style.background = '#22c55e';
         });
 
+        // Guard flag — prevents duplicate calls from multiple simultaneous events
+        let isSubmitting = false;
+
         const submitSignup = async (e) => {
             e.preventDefault();
+            e.stopImmediatePropagation();
+
+            if (isSubmitting) return;
+
             let isValid = true;
             document.querySelectorAll('.input-group').forEach(g => g.classList.remove('is-invalid'));
 
@@ -515,6 +522,7 @@
 
             if (!isValid) return;
 
+            isSubmitting = true;
             submitBtn.disabled = true;
             submitBtn.innerHTML = 'Creating...';
 
@@ -540,28 +548,24 @@
                     showNotif('Almost there! Check your email to confirm your account.', 'success');
                     setTimeout(() => window.location.href = './login.html?auth=signup-success', 2500);
                 } else if (data?.session) {
-                    showNotif('Account created! Redirecting...', 'success');
-                    setTimeout(() => window.location.href = './my-account.html', 1500);
+                    showNotif('Account created! Taking you home...', 'success');
+                    window.location.replace('./index.html');
                 } else {
                     throw new Error('Signup failed. Please try again.');
                 }
             } catch (err) {
                 const msg = err.message || 'Signup failed.';
                 showNotif(/already registered/i.test(msg) ? 'This email is already registered. Try signing in.' : msg, 'error');
-            } finally {
+                isSubmitting = false;
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = 'Create Account <i data-lucide="arrow-right"></i>';
                 lucide.createIcons();
             }
         };
 
+        // Only listen on form submit — avoids duplicate calls from click/touch events
         form.addEventListener('submit', submitSignup);
-        submitBtn.addEventListener('click', submitSignup);
-        submitBtn.addEventListener('pointerup', submitSignup);
-        submitBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            submitSignup(e);
-        }, { passive: false });
+    
     </script>
 </body>
 </html>

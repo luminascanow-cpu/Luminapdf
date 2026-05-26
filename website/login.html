@@ -485,8 +485,15 @@
             lucide.createIcons();
         });
 
+        // Guard flag — prevents duplicate calls when multiple events fire on one tap
+        let isSubmitting = false;
+
         const submitLogin = async (e) => {
             e.preventDefault();
+            e.stopImmediatePropagation();
+
+            // Bail out immediately if already in-flight
+            if (isSubmitting) return;
 
             let isValid = true;
             document.querySelectorAll('.input-group').forEach(g => g.classList.remove('is-invalid'));
@@ -502,6 +509,7 @@
             }
             if (!isValid) return;
 
+            isSubmitting = true;
             submitBtn.disabled = true;
             overlay.style.display = 'flex';
 
@@ -513,26 +521,25 @@
 
                 if (error) {
                     showNotif(error.message || 'Login failed. Check your credentials.', 'error');
+                    isSubmitting = false;
+                    submitBtn.disabled = false;
+                    overlay.style.display = 'none';
                 } else {
-                    showNotif('Success! Redirecting...', 'success');
-                    setTimeout(() => window.location.href = './my-account.html', 1000);
+                    // Success — redirect to home (keep overlay visible during redirect)
+                    showNotif('Signed in! Taking you home...', 'success');
+                    window.location.replace('./index.html');
                 }
             } catch (err) {
                 showNotif('Unexpected error. Please try again.', 'error');
                 console.error('Login error:', err);
-            } finally {
+                isSubmitting = false;
                 submitBtn.disabled = false;
                 overlay.style.display = 'none';
             }
         };
 
+        // Only listen on form submit — avoids duplicate calls from click/touch events
         form.addEventListener('submit', submitLogin);
-        submitBtn.addEventListener('click', submitLogin);
-        submitBtn.addEventListener('pointerup', submitLogin);
-        submitBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            submitLogin(e);
-        }, { passive: false });
 
         // Show success message after signup redirect
         const urlParams = new URLSearchParams(window.location.search);
