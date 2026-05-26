@@ -3051,6 +3051,7 @@ a {
 }
 
 @media (max-width: 760px) {
+  /* ── Global nav ── */
   .nav {
     min-height: 72px;
   }
@@ -3090,6 +3091,47 @@ a {
     margin-top: 8px;
   }
 
+  /* ── Editor nav: collapse 3-col grid → 2-col (brand | actions) ── */
+  .editor-nav {
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto;
+    gap: 12px;
+    min-height: 68px;
+    padding: 10px 0;
+  }
+
+  /* Hide the center "PDF Editor" copy on mobile to save horizontal space */
+  .editor-nav-copy {
+    display: none;
+  }
+
+  /* Actions sit in the second column, right-aligned */
+  .editor-nav-actions {
+    grid-column: 2;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  /* Shrink action buttons so they fit */
+  .editor-nav-actions .button {
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    min-height: 42px;
+  }
+
+  /* Hide the hamburger toggle inside editor-nav (editor has its own action row) */
+  .editor-nav .menu-toggle {
+    display: none;
+  }
+
+  /* Brand mark: slightly smaller on mobile */
+  .brand-mark {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* ── Hero ── */
   .hero {
     padding-top: 42px;
   }
@@ -3100,17 +3142,18 @@ a {
 
   .dropzone-card {
     padding: 28px 24px;
-    min-height: 460px;
+    min-height: 420px;
   }
 
   .dropzone-card h3 {
-    font-size: clamp(2.4rem, 12vw, 4rem);
+    font-size: clamp(2rem, 10vw, 3.6rem);
   }
 
   .dropzone-card p {
     font-size: 1rem;
   }
 
+  /* ── Grids → single column ── */
   .hero-stats,
   .feature-grid,
   .legal-grid,
@@ -3120,6 +3163,7 @@ a {
     grid-template-columns: 1fr;
   }
 
+  /* ── Toolbar ── */
   .toolbar-group,
   .toolbar-group-utility {
     justify-content: stretch;
@@ -3133,6 +3177,7 @@ a {
     flex: 1 1 calc(25% - 6px);
   }
 
+  /* ── Editor thumbnail strip ── */
   .editor-thumbnails-strip {
     display: flex;
     min-height: 78px;
@@ -3140,6 +3185,7 @@ a {
     overflow-y: hidden;
   }
 
+  /* ── Card padding ── */
   .page-hero,
   .feature-card,
   .legal-card,
@@ -3170,5 +3216,97 @@ a {
 
   .footer-grid {
     flex-direction: column;
+  }
+
+  /* ── Left rail: full-width on tablet/mobile ── */
+  .editor-left-rail {
+    width: 100%;
+    position: static;
+  }
+
+  .rail-placeholder {
+    display: none;
+  }
+}
+
+/* ────────────────────────────────────────────────
+   Extra-small phones  ≤ 480 px
+──────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  /* Brand: hide text copy entirely, keep logo mark */
+  .brand-copy {
+    display: none;
+  }
+
+  .brand-mark {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+  }
+
+  /* Editor nav: stack brand above actions if needed */
+  .editor-nav {
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    padding: 8px 0;
+  }
+
+  .editor-nav-actions .button {
+    padding: 8px 12px;
+    font-size: 0.78rem;
+    min-height: 38px;
+  }
+
+  /* Dropzone */
+  .dropzone-card {
+    padding: 20px 16px;
+    min-height: 360px;
+  }
+
+  .dropzone-card h3 {
+    font-size: clamp(1.8rem, 9vw, 2.8rem);
+  }
+
+  /* Shell horizontal padding */
+  .shell {
+    width: calc(100% - 24px);
+  }
+
+  /* Buttons: full-width in stacked layouts */
+  .cta-actions .button,
+  .hero-copy .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Typography scale-down */
+  .page-hero h1 {
+    font-size: clamp(1.9rem, 8vw, 2.6rem);
+  }
+
+  .hero h1 {
+    font-size: clamp(2rem, 9vw, 3rem);
+  }
+
+  /* Section padding */
+  .section {
+    padding: 42px 0;
+  }
+
+  /* Editor toolbar: icon-only buttons get a bit larger touch target */
+  .tool-btn.icon-only {
+    flex: 1 1 calc(33% - 6px);
+    min-height: 48px;
+  }
+
+  /* Modals */
+  .signature-modal-card {
+    border-radius: 20px;
+    padding: 18px;
+  }
+
+  /* Footer */
+  .footer {
+    padding: 36px 0 24px;
   }
 }
