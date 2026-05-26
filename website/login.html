@@ -10,6 +10,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Supabase -->
+    <script src="./app-config.js"></script>
+    <script src="./supabase.js"></script>
     <style>
         :root {
             --primary: #8b5cf6;
@@ -406,7 +409,7 @@
                 <a class="auth-tab" href="./signup.html">Sign Up</a>
             </div>
 
-            <form id="login-form" action="./auth/sign-in" method="post">
+            <form id="login-form">
                 <div class="input-group" id="group-email">
                     <label for="email">Email Address</label>
                     <div class="input-wrapper">
@@ -457,6 +460,10 @@
     <script>
         lucide.createIcons();
 
+        // Initialize Supabase client
+        const cfg = window.__LUMINA_CONFIG__ || {};
+        const supabaseClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+
         const form = document.getElementById('login-form');
         const emailInput = document.getElementById('email');
         const passInput = document.getElementById('password');
@@ -468,7 +475,7 @@
         function showNotif(text, type = 'info') {
             notifText.textContent = text;
             notif.className = 'show ' + (type === 'error' ? 'notif-error' : '');
-            setTimeout(() => notif.className = '', 4000);
+            setTimeout(() => notif.className = '', 5000);
         }
 
         document.getElementById('pw-toggle').addEventListener('click', function() {
@@ -480,7 +487,7 @@
 
         const submitLogin = async (e) => {
             e.preventDefault();
-            
+
             let isValid = true;
             document.querySelectorAll('.input-group').forEach(g => g.classList.remove('is-invalid'));
 
@@ -489,43 +496,30 @@
                 document.getElementById('group-email').classList.add('is-invalid');
                 isValid = false;
             }
-
             if (!passInput.value) {
                 document.getElementById('group-password').classList.add('is-invalid');
                 isValid = false;
             }
-
             if (!isValid) return;
 
             submitBtn.disabled = true;
             overlay.style.display = 'flex';
-            
+
             try {
-                const payload = new URLSearchParams({
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
                     email: emailInput.value.trim().toLowerCase(),
                     password: passInput.value
                 });
 
-                const res = await fetch('./auth/sign-in', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
-                    },
-                    body: payload.toString()
-                });
-
-                const data = await res.json().catch(() => ({}));
-
-                if (res.ok && data.success) {
-                    showNotif('Success! Redirecting...', 'success');
-                    setTimeout(() => window.location.href = data.redirect || './my-account.html', 1000);
+                if (error) {
+                    showNotif(error.message || 'Login failed. Check your credentials.', 'error');
                 } else {
-                    showNotif(data.message || 'Login failed', 'error');
+                    showNotif('Success! Redirecting...', 'success');
+                    setTimeout(() => window.location.href = './my-account.html', 1000);
                 }
             } catch (err) {
-                showNotif('Connection error. Try again later.', 'error');
+                showNotif('Unexpected error. Please try again.', 'error');
+                console.error('Login error:', err);
             } finally {
                 submitBtn.disabled = false;
                 overlay.style.display = 'none';
@@ -540,7 +534,7 @@
             submitLogin(e);
         }, { passive: false });
 
-        // Check for success message from signup
+        // Show success message after signup redirect
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('auth') === 'signup-success') {
             showNotif('Account created! Please sign in.', 'success');

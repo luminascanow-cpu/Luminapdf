@@ -407,7 +407,7 @@
                 <button class="auth-tab active" type="button">Sign Up</button>
             </div>
 
-            <form id="signup-form" action="./auth/sign-up" method="post">
+            <form id="signup-form">
                 <div class="input-group" id="group-name">
                     <label for="full-name">Full Name</label>
                     <div class="input-wrapper">
@@ -461,6 +461,8 @@
         <span id="notif-text"></span>
     </div>
 
+    <script src="./app-config.js"></script>
+    <script src="./supabase.js"></script>
     <script>
         lucide.createIcons();
 
@@ -477,7 +479,7 @@
         function showNotif(text, type = 'info') {
             notifText.textContent = text;
             notif.className = 'show ' + (type === 'error' ? 'notif-error' : '');
-            setTimeout(() => notif.className = '', 4000);
+            setTimeout(() => notif.className = '', 5000);
         }
 
         document.getElementById('pw-toggle').addEventListener('click', function() {
@@ -509,39 +511,43 @@
             if (!nameInput.value.trim()) { document.getElementById('group-name').classList.add('is-invalid'); isValid = false; }
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value)) { document.getElementById('group-email').classList.add('is-invalid'); isValid = false; }
             if (passInput.value.length < 8) { document.getElementById('group-password').classList.add('is-invalid'); isValid = false; }
-            if (!termsInput.checked) { showNotif('Please agree to the terms', 'error'); isValid = false; }
+            if (!termsInput.checked) { showNotif('Please agree to the terms to continue.', 'error'); isValid = false; }
 
             if (!isValid) return;
 
             submitBtn.disabled = true;
             submitBtn.innerHTML = 'Creating...';
-            
+
             try {
-                const payload = new URLSearchParams({
-                    full_name: nameInput.value.trim(),
+                const cfg = window.__LUMINA_CONFIG__ || {};
+                if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
+                    throw new Error('Auth configuration missing. Please refresh and try again.');
+                }
+
+                const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+                const { data, error } = await client.auth.signUp({
                     email: emailInput.value.trim().toLowerCase(),
-                    password: passInput.value
+                    password: passInput.value,
+                    options: {
+                        data: { full_name: nameInput.value.trim() }
+                    }
                 });
 
-                const res = await fetch('./auth/sign-up', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
-                    },
-                    body: payload.toString()
-                });
+                if (error) throw error;
 
-                const data = await res.json().catch(() => ({}));
-                if (res.ok && data.success) {
+                // Supabase may require email confirmation
+                if (data?.user && !data?.session) {
+                    showNotif('Almost there! Check your email to confirm your account.', 'success');
+                    setTimeout(() => window.location.href = './login.html?auth=signup-success', 2500);
+                } else if (data?.session) {
                     showNotif('Account created! Redirecting...', 'success');
-                    setTimeout(() => window.location.href = data.redirect || './my-account.html', 1500);
+                    setTimeout(() => window.location.href = './my-account.html', 1500);
                 } else {
-                    showNotif(data.message || 'Signup failed', 'error');
+                    throw new Error('Signup failed. Please try again.');
                 }
             } catch (err) {
-                showNotif('Connection error. Try again later.', 'error');
+                const msg = err.message || 'Signup failed.';
+                showNotif(/already registered/i.test(msg) ? 'This email is already registered. Try signing in.' : msg, 'error');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = 'Create Account <i data-lucide="arrow-right"></i>';
